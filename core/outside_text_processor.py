@@ -28,6 +28,99 @@ from utils.logging import log_message
 # OSB Expansion Parameters
 OSB_EXPANSION_PIXEL_BUFFER = 5  # for bubbles, nearby OSB regions, panels
 
+# Flat background detection. Regions sitting on a single uniform tone are filled
+# directly instead of being handed to Flux, which would only regenerate the same
+# blank background at full inference cost.
+FLAT_BG_LAB_TOLERANCE = 12.0  # max distance from the median tone (OpenCV 8-bit LAB)
+FLAT_BG_INLIER_RATIO = 0.97  # fraction of sampled pixels that must be within it
+FLAT_BG_MIN_SAMPLES = 40
+FLAT_BG_TEXT_PADDING = 3  # px kept clear of the text box so glyph edges aren't sampled
+FLAT_BG_MIN_OUTLIER_AREA = 8  # smaller outlier blobs are scan speckle, not artwork
+FLAT_BG_MAX_OUTLIER_RATIO = 0.002  # allowance for structured outliers before rejecting
+FLAT_BG_MAX_DRIFT = 6.0  # max median-to-median difference between halves (no gradients)
+
+
+def estimate_flat_background_color(
+    image: Image.Image,
+    fill_bbox: Tuple[int, int, int, int],
+    text_bbox: Tuple[int, int, int, int],
+    ring_px: int = 2,
+) -> Optional[Tuple[int, int, int]]:
+    """Return the uniform tone a region sits on, or None if it isn't uniform.
+
+    Samples everything the simple fill would paint over except the text box
+    itself, plus a thin ring just outside it, and checks the sample is a single
+    tone within a perceptual tolerance. Unlike a pure white/black test this
+    tolerates paper texture, JPEG noise and off-white or tinted pages, and it
+    returns the actual tone so the fill matches its surroundings.
+    """
+    img_w, img_h = image.size
+    fx1, fy1, fx2, fy2 = fill_bbox
+    sx1 = max(0, int(fx1) - ring_px)
+    sy1 = max(0, int(fy1) - ring_px)
+    sx2 = min(img_w, int(fx2) + ring_px)
+    sy2 = min(img_h, int(fy2) + ring_px)
+    if sx2 <= sx1 or sy2 <= sy1:
+        return None
+
+    crop = np.array(image.crop((sx1, sy1, sx2, sy2)).convert("RGB"))
+    sample_mask = np.ones(crop.shape[:2], dtype=bool)
+
+    tx1, ty1, tx2, ty2 = [int(c) for c in text_bbox]
+    ix1 = max(0, tx1 - FLAT_BG_TEXT_PADDING - sx1)
+    iy1 = max(0, ty1 - FLAT_BG_TEXT_PADDING - sy1)
+    ix2 = min(crop.shape[1], tx2 + FLAT_BG_TEXT_PADDING - sx1)
+    iy2 = min(crop.shape[0], ty2 + FLAT_BG_TEXT_PADDING - sy1)
+    if ix2 > ix1 and iy2 > iy1:
+        sample_mask[iy1:iy2, ix1:ix2] = False
+
+    if np.count_nonzero(sample_mask) < FLAT_BG_MIN_SAMPLES:
+        return None
+
+    lab = cv2.cvtColor(crop, cv2.COLOR_RGB2LAB).astype(np.float32)
+    median_lab = np.median(lab[sample_mask], axis=0)
+    dist = np.linalg.norm(lab - median_lab.reshape(1, 1, 3), axis=2)
+
+    outliers = (dist > FLAT_BG_LAB_TOLERANCE) & sample_mask
+    if np.mean(outliers[sample_mask]) > 1.0 - FLAT_BG_INLIER_RATIO:
+        return None
+
+    # Noise scatters; artwork connects. Anything left after dropping speckle-sized
+    # blobs is real content that a flat fill would erase.
+    n_labels, _, stats, _ = cv2.connectedComponentsWithStats(
+        outliers.astype(np.uint8), connectivity=8
+    )
+    structured_area = sum(
+        int(stats[label, cv2.CC_STAT_AREA])
+        for label in range(1, n_labels)
+        if stats[label, cv2.CC_STAT_AREA] >= FLAT_BG_MIN_OUTLIER_AREA
+    )
+    if structured_area > FLAT_BG_MAX_OUTLIER_RATIO * np.count_nonzero(sample_mask):
+        return None
+
+    # A gradient can stay inside the tolerance yet still band visibly once filled,
+    # so check the tone does not drift across the region.
+    h, w = sample_mask.shape
+    halves = (
+        (sample_mask[:, : w // 2], sample_mask[:, w // 2 :]),
+        (sample_mask[: h // 2], sample_mask[h // 2 :]),
+    )
+    lab_halves = (
+        (lab[:, : w // 2], lab[:, w // 2 :]),
+        (lab[: h // 2], lab[h // 2 :]),
+    )
+    for (mask_a, mask_b), (lab_a, lab_b) in zip(halves, lab_halves):
+        if not mask_a.any() or not mask_b.any():
+            continue
+        drift = np.linalg.norm(
+            np.median(lab_a[mask_a], axis=0) - np.median(lab_b[mask_b], axis=0)
+        )
+        if drift > FLAT_BG_MAX_DRIFT:
+            return None
+
+    median_rgb = np.median(crop[sample_mask].astype(np.float32), axis=0)
+    return tuple(round(float(c)) for c in median_rgb)
+
 
 @dataclass
 class OutsideTextWork:
@@ -1158,7 +1251,6 @@ def finish_outside_text_work(
 
                                     white_thresh = 250
                                     black_thresh = 5
-                                    ratio_threshold = 0.95
 
                                     white_ratio = np.mean(
                                         np.all(border_pixels >= white_thresh, axis=1)
@@ -1225,71 +1317,36 @@ def finish_outside_text_work(
                                             ),
                                         )
 
-                                    force_fill = inpainting_method == "opencv"
+                                    # Everything the fill would cover is a single tone:
+                                    # no point paying for Flux to regenerate it
+                                    flat_fill_color = estimate_flat_background_color(
+                                        current_image,
+                                        (p_x0, p_y0, p_x1, p_y1),
+                                        (rx0, ry0, rx1, ry1),
+                                        ring_px=expansion_px,
+                                    )
 
-                                    # Simply check if the expanded boundary is solid color
-                                    expanded_is_solid = False
-                                    if not force_fill:
-                                        ex_sx1 = max(0, p_x0 - expansion_px)
-                                        ex_sy1 = max(0, p_y0 - expansion_px)
-                                        ex_sx2 = min(img_w, p_x1 + expansion_px)
-                                        ex_sy2 = min(img_h, p_y1 + expansion_px)
-
-                                        if ex_sx2 > ex_sx1 and ex_sy2 > ex_sy1:
-                                            # Grab boundary pixels using Numpy directly for speed
-                                            crop_img = current_image.crop(
-                                                (ex_sx1, ex_sy1, ex_sx2, ex_sy2)
-                                            )
-                                            ecrop_np = np.array(crop_img.convert("RGB"))
-                                            elocal_mask = np.ones(
-                                                ecrop_np.shape[:2], dtype=bool
-                                            )
-
-                                            ix1 = max(0, p_x0 - ex_sx1)
-                                            iy1 = max(0, p_y0 - ex_sy1)
-                                            ix2 = min(ecrop_np.shape[1], p_x1 - ex_sx1)
-                                            iy2 = min(ecrop_np.shape[0], p_y1 - ex_sy1)
-
-                                            if ix2 > ix1 and iy2 > iy1:
-                                                elocal_mask[iy1:iy2, ix1:ix2] = False
-
-                                            eborder_pixels = ecrop_np[elocal_mask]
-                                            if eborder_pixels.size > 0:
-                                                ewhite_ratio = np.mean(
-                                                    np.all(
-                                                        eborder_pixels >= white_thresh,
-                                                        axis=1,
-                                                    )
-                                                )
-                                                eblack_ratio = np.mean(
-                                                    np.all(
-                                                        eborder_pixels <= black_thresh,
-                                                        axis=1,
-                                                    )
-                                                )
-                                                if (
-                                                    ewhite_ratio >= ratio_threshold
-                                                    or eblack_ratio >= ratio_threshold
-                                                ):
-                                                    expanded_is_solid = True
-
-                                    should_simple_fill = expanded_is_solid or force_fill
+                                    should_simple_fill = (
+                                        flat_fill_color is not None or force_fill
+                                    )
 
                                     if should_simple_fill:
-                                        fill_color = fallback_fill_color
+                                        fill_color = (
+                                            flat_fill_color
+                                            if flat_fill_color is not None
+                                            else fallback_fill_color
+                                        )
 
-                                        if force_fill and not (
-                                            white_ratio >= ratio_threshold
-                                            or black_ratio >= ratio_threshold
-                                        ):
+                                        if flat_fill_color is not None:
                                             log_message(
-                                                "Forcing CV2 fill: defaulting to "
-                                                f"{'white' if fill_color == (255, 255, 255) else 'black'} background",
+                                                f"Skipping Flux for OSB region {i + 1}: "
+                                                "uniform background detected, filling with "
+                                                f"RGB{fill_color}",
                                                 verbose=verbose,
                                             )
                                         else:
                                             log_message(
-                                                "Skipping Flux for OSB region: detected pure "
+                                                "Forcing CV2 fill: defaulting to "
                                                 f"{'white' if fill_color == (255, 255, 255) else 'black'} background",
                                                 verbose=verbose,
                                             )
