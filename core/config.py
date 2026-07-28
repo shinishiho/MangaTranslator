@@ -132,6 +132,8 @@ class OutsideTextConfig:
     )
     flux_backend: str = "sdnq"  # "sdcpp", "sdnq", "nunchaku" (Kontext only)
     flux_low_vram: bool = False  # Use CPU offload for SDNQ
+    # Swap OCR/upscale models out of VRAM before Flux, and Flux out afterwards
+    flux_unload_between_stages: bool = False
     flux_sdcpp_cache_mode: str = "none"
     flux_sdcpp_diffusion_quant: str = "Q4_K_M"
     flux_sdcpp_text_encoder_quant: str = ""

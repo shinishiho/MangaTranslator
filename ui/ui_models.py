@@ -131,6 +131,7 @@ class UIOutsideTextSettings:
     )
     flux_backend: str = "sdnq"  # "sdcpp", "sdnq", "nunchaku" (Kontext only)
     flux_low_vram: bool = False  # Use CPU offload for SDNQ
+    flux_unload_between_stages: bool = False  # Swap aux models and Flux in VRAM
     flux_sdcpp_cache_mode: str = "none"
     flux_sdcpp_diffusion_quant: str = "Q4_K_M"
     flux_sdcpp_text_encoder_quant: str = "Q4_K_XL"
@@ -292,6 +293,7 @@ class UIConfigState:
             "outside_text_inpainting_method": self.outside_text.inpainting_method,
             "outside_text_flux_backend": self.outside_text.flux_backend,
             "outside_text_flux_low_vram": self.outside_text.flux_low_vram,
+            "outside_text_flux_unload_between_stages": self.outside_text.flux_unload_between_stages,
             "outside_text_flux_sdcpp_cache_mode": self.outside_text.flux_sdcpp_cache_mode,
             "outside_text_flux_sdcpp_diffusion_quant": self.outside_text.flux_sdcpp_diffusion_quant,
             "outside_text_flux_sdcpp_text_encoder_quant": self.outside_text.flux_sdcpp_text_encoder_quant,
@@ -452,6 +454,9 @@ class UIConfigState:
                     defaults.get("outside_text_flux_backend", "sdnq"),
                 ),
                 flux_low_vram=data.get("outside_text_flux_low_vram", False),
+                flux_unload_between_stages=data.get(
+                    "outside_text_flux_unload_between_stages", False
+                ),
                 flux_sdcpp_cache_mode=data.get(
                     "outside_text_flux_sdcpp_cache_mode",
                     defaults.get("outside_text_flux_sdcpp_cache_mode", "none"),
@@ -843,6 +848,7 @@ def map_ui_to_backend_config(
         inpainting_method=ui_state.outside_text.inpainting_method,
         flux_backend=ui_state.outside_text.flux_backend,
         flux_low_vram=ui_state.outside_text.flux_low_vram,
+        flux_unload_between_stages=ui_state.outside_text.flux_unload_between_stages,
         flux_sdcpp_cache_mode=ui_state.outside_text.flux_sdcpp_cache_mode,
         flux_sdcpp_diffusion_quant=ui_state.outside_text.flux_sdcpp_diffusion_quant,
         flux_sdcpp_text_encoder_quant=ui_state.outside_text.flux_sdcpp_text_encoder_quant,

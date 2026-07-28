@@ -122,6 +122,7 @@
   - Ensure hf_token is set (see Installation/Post-Install Setup)
 
 - **Out of VRAM / CUDA errors:**
+  - Enable "Unload Models Between Stages" if the detection/OCR/upscale models and Flux cannot fit in VRAM at the same time (models reload each stage, so pages take longer)
   - Enable "Low VRAM Mode" (SDNQ only)
   - Select a lower Flux/text_encoder quant (sd.cpp only)
   - Disable "Upscale Klein Crops to ~1MP"
