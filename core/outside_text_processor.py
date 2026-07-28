@@ -28,6 +28,13 @@ from utils.logging import log_message
 # OSB Expansion Parameters
 OSB_EXPANSION_PIXEL_BUFFER = 5  # for bubbles, nearby OSB regions, panels
 
+FLUX_BACKEND_LABELS = {
+    "sdnq": "SDNQ",
+    "sdcpp": "sd.cpp (managed)",
+    "sdcpp_remote": "Remote sd.cpp",
+    "nunchaku": "Nunchaku",
+}
+
 
 @dataclass
 class OutsideTextWork:
@@ -664,12 +671,13 @@ def finish_outside_text_work(
                     luminance_correction=config.outside_text.flux_luminance_correction,
                     upscale_small_crops=config.outside_text.flux_upscale_small_crops,
                     backend=backend,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
                     verbose=verbose,
                 )
-                backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
+                backend_label = FLUX_BACKEND_LABELS.get(backend, backend)
                 log_message(
                     f"Using Flux.2 Klein 9B ({backend_label}) for inpainting",
                     verbose=verbose,
@@ -692,12 +700,13 @@ def finish_outside_text_work(
                     luminance_correction=config.outside_text.flux_luminance_correction,
                     upscale_small_crops=config.outside_text.flux_upscale_small_crops,
                     backend=backend,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
                     verbose=verbose,
                 )
-                backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
+                backend_label = FLUX_BACKEND_LABELS.get(backend, backend)
                 log_message(
                     f"Using Flux.2 Klein 4B ({backend_label}) for inpainting",
                     verbose=verbose,
@@ -721,15 +730,12 @@ def finish_outside_text_work(
                     residual_diff_threshold=config.outside_text.flux_residual_diff_threshold,
                     backend=backend,
                     low_vram=low_vram,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
                 )
-                backend_label = {
-                    "sdnq": "SDNQ",
-                    "sdcpp": "sd.cpp",
-                    "nunchaku": "Nunchaku",
-                }[backend]
+                backend_label = FLUX_BACKEND_LABELS.get(backend, backend)
                 log_message(
                     f"Using Flux.1 Kontext ({backend_label}) for inpainting",
                     verbose=verbose,

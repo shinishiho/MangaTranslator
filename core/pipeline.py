@@ -113,6 +113,7 @@ def _clean_speech_bubbles_for_page(
             inpaint_method=config.outside_text.inpainting_method,
             flux_backend=config.outside_text.flux_backend,
             flux_low_vram=config.outside_text.flux_low_vram,
+            flux_sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
             flux_sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
             flux_sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
             flux_sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,

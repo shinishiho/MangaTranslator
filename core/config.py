@@ -130,7 +130,8 @@ class OutsideTextConfig:
     inpainting_method: str = (
         "flux_klein_4b"  # flux_klein_9b, flux_klein_4b, flux_kontext, opencv, none
     )
-    flux_backend: str = "sdnq"  # "sdcpp", "sdnq", "nunchaku" (Kontext only)
+    flux_backend: str = "sdnq"  # "sdcpp", "sdcpp_remote", "sdnq", "nunchaku"
+    flux_sdcpp_remote_url: str = ""  # Base URL for the "sdcpp_remote" backend
     flux_low_vram: bool = False  # Use CPU offload for SDNQ
     flux_sdcpp_cache_mode: str = "none"
     flux_sdcpp_diffusion_quant: str = "Q4_K_M"

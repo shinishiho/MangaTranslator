@@ -10,7 +10,11 @@ from scipy.ndimage import distance_transform_edt
 from core.caching import get_cache
 from core.device import empty_cache, get_best_device, get_best_dtype
 from core.ml.model_manager import get_model_manager
-from core.ml.sdcpp_server import pil_to_base64_png, run_image_job
+from core.ml.sdcpp_server import (
+    normalize_sdcpp_server_url,
+    pil_to_base64_png,
+    run_image_job,
+)
 from utils.exceptions import ModelError
 from utils.logging import log_message
 from utils.model_metadata import (
@@ -95,6 +99,7 @@ class FluxKontextInpainter:
         num_inference_steps: int = 8,
         residual_diff_threshold: float = 0.15,
         backend: str = "nunchaku",
+        sdcpp_remote_url: str = "",
         low_vram: bool = False,
         sdcpp_cache_mode: str = "none",
         sdcpp_diffusion_quant: str = "",
@@ -107,7 +112,9 @@ class FluxKontextInpainter:
             huggingface_token: HuggingFace token for model downloads (Nunchaku only).
             num_inference_steps: Number of denoising steps for inference.
             residual_diff_threshold: Residual diff threshold for Flux caching (Nunchaku only).
-            backend: "nunchaku" (CUDA + Nunchaku + HF token), "sdnq", or "sdcpp".
+            backend: "nunchaku" (CUDA + Nunchaku + HF token), "sdnq", managed
+                "sdcpp", or "sdcpp_remote" (an externally managed sd.cpp server).
+            sdcpp_remote_url: Base URL of the sd.cpp server for "sdcpp_remote".
             low_vram: If True, use sequential CPU offload for SDNQ.
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
             sdcpp_diffusion_quant: Flux sd.cpp diffusion model quant.
@@ -119,11 +126,16 @@ class FluxKontextInpainter:
         self.num_inference_steps = num_inference_steps
         self.residual_diff_threshold = residual_diff_threshold
         self.backend = backend.lower()
-        if self.backend not in ("nunchaku", "sdnq", "sdcpp"):
+        if self.backend not in ("nunchaku", "sdnq", "sdcpp", "sdcpp_remote"):
             raise ValueError(
                 f"Invalid Kontext backend '{backend}'. "
-                "Must be 'nunchaku', 'sdnq', or 'sdcpp'."
+                "Must be 'nunchaku', 'sdnq', 'sdcpp', or 'sdcpp_remote'."
             )
+        self.sdcpp_remote_url = (
+            normalize_sdcpp_server_url(sdcpp_remote_url)
+            if self.backend == "sdcpp_remote"
+            else ""
+        )
         self.low_vram = low_vram
         self.sdcpp_cache_mode = sdcpp_cache_mode
         self.sdcpp_diffusion_quant = sdcpp_diffusion_quant or flux_sdcpp_quant_default(
@@ -193,6 +205,15 @@ class FluxKontextInpainter:
                 diffusion_quant=self.sdcpp_diffusion_quant,
                 text_encoder_quant=self.sdcpp_text_encoder_quant,
                 num_inference_steps=self.num_inference_steps,
+                verbose=True,
+            )
+            self.pipeline = self.sdcpp_assets
+            self.transformer = None
+            self.text_encoder_2 = None
+        elif self.backend == "sdcpp_remote":
+            self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
+                self.sdcpp_remote_url,
+                "flux_kontext",
                 verbose=True,
             )
             self.pipeline = self.sdcpp_assets
@@ -788,6 +809,9 @@ class FluxKontextInpainter:
             cache_params["sdcpp_cache"] = self.sdcpp_cache_mode
             cache_params["sdcpp_diffusion_quant"] = self.sdcpp_diffusion_quant
             cache_params["sdcpp_text_encoder_quant"] = self.sdcpp_text_encoder_quant
+        elif self.backend == "sdcpp_remote":
+            # The remote server owns quant/cache settings, so its URL is the identity.
+            cache_params["sdcpp_remote_url"] = self.sdcpp_remote_url
         if strict_mask_clipping:
             cache_params["strict_clip"] = True
         if composite_clip_bbox is not None:
@@ -856,7 +880,7 @@ class FluxKontextInpainter:
                     )
                     return image_pil
 
-                if self.backend == "sdcpp":
+                if self.backend in ("sdcpp", "sdcpp_remote"):
                     generated_patch_pil = self._run_sdcpp_inference(
                         image_scaled_for_inference_pil,
                         inference_width,
@@ -1012,6 +1036,7 @@ class FluxKleinInpainter:
         luminance_correction: bool = True,
         upscale_small_crops: bool = True,
         backend: str = "sdnq",
+        sdcpp_remote_url: str = "",
         sdcpp_cache_mode: str = "none",
         sdcpp_diffusion_quant: str = "",
         sdcpp_text_encoder_quant: str = "",
@@ -1027,7 +1052,9 @@ class FluxKleinInpainter:
             low_vram: If True, use sequential CPU offload for SDNQ.
             luminance_correction: If True, match patch luminance to surrounding context.
             upscale_small_crops: If True, scale small crops to ~1MP before inference.
-            backend: "sdnq" for Diffusers/SDNQ or "sdcpp" for stable-diffusion.cpp.
+            backend: "sdnq" for Diffusers/SDNQ, "sdcpp" for a managed
+                stable-diffusion.cpp server, or "sdcpp_remote" for an external one.
+            sdcpp_remote_url: Base URL of the sd.cpp server for "sdcpp_remote".
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
             sdcpp_diffusion_quant: Flux sd.cpp diffusion model quant.
             sdcpp_text_encoder_quant: Flux sd.cpp Qwen text encoder quant.
@@ -1038,10 +1065,16 @@ class FluxKleinInpainter:
             raise ValueError(f"Invalid variant '{variant}'. Must be '9b' or '4b'.")
 
         self.backend = backend.lower()
-        if self.backend not in ("sdnq", "sdcpp"):
+        if self.backend not in ("sdnq", "sdcpp", "sdcpp_remote"):
             raise ValueError(
-                f"Invalid Klein backend '{backend}'. Must be 'sdnq' or 'sdcpp'."
+                f"Invalid Klein backend '{backend}'. "
+                "Must be 'sdnq', 'sdcpp', or 'sdcpp_remote'."
             )
+        self.sdcpp_remote_url = (
+            normalize_sdcpp_server_url(sdcpp_remote_url)
+            if self.backend == "sdcpp_remote"
+            else ""
+        )
 
         self.num_inference_steps = num_inference_steps
         self.low_vram = low_vram
@@ -1087,6 +1120,15 @@ class FluxKleinInpainter:
             self.pipeline = self.sdcpp_assets
             return
 
+        if self.backend == "sdcpp_remote":
+            self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
+                self.sdcpp_remote_url,
+                f"flux_klein_{self.variant}",
+                verbose=self.verbose,
+            )
+            self.pipeline = self.sdcpp_assets
+            return
+
         if self.variant == "9b":
             self.pipeline = self.manager.load_flux_klein_9b(
                 low_vram=self.low_vram, verbose=self.verbose
@@ -1104,7 +1146,8 @@ class FluxKleinInpainter:
         self._pooled_prompt_embeds_cpu = None
         if self.backend == "sdcpp":
             self.manager.shutdown_sdcpp_server(f"flux_klein_{self.variant}")
-        else:
+        elif self.backend != "sdcpp_remote":
+            # We don't own a remote server's lifecycle, and it holds no local VRAM.
             self.manager.unload_flux_klein_models()
 
     def _get_prompt_embeddings(self, device: torch.device, verbose: bool = False):
@@ -1454,6 +1497,9 @@ class FluxKleinInpainter:
             cache_params["sdcpp_cache"] = self.sdcpp_cache_mode
             cache_params["sdcpp_diffusion_quant"] = self.sdcpp_diffusion_quant
             cache_params["sdcpp_text_encoder_quant"] = self.sdcpp_text_encoder_quant
+        elif self.backend == "sdcpp_remote":
+            # The remote server owns quant/cache settings, so its URL is the identity.
+            cache_params["sdcpp_remote_url"] = self.sdcpp_remote_url
         if strict_mask_clipping:
             cache_params["strict_clip"] = True
         if composite_clip_bbox is not None:
@@ -1555,7 +1601,7 @@ class FluxKleinInpainter:
                     )
                     return image_pil
 
-                if self.backend == "sdcpp":
+                if self.backend in ("sdcpp", "sdcpp_remote"):
                     generated_patch_pil = self._run_sdcpp_inference(
                         inference_image,
                         inference_w,

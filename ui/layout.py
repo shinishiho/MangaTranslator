@@ -16,11 +16,13 @@ from utils.model_metadata import (
 from . import callbacks, settings_manager, utils
 
 _FLUX_BACKEND_CHOICES_KLEIN = [
-    ("sd.cpp", "sdcpp"),
+    ("sd.cpp (managed)", "sdcpp"),
+    ("Remote sd.cpp", "sdcpp_remote"),
     ("SDNQ", "sdnq"),
 ]
 _FLUX_BACKEND_CHOICES_KONTEXT = [
-    ("sd.cpp", "sdcpp"),
+    ("sd.cpp (managed)", "sdcpp"),
+    ("Remote sd.cpp", "sdcpp_remote"),
     ("SDNQ", "sdnq"),
     ("Nunchaku (CUDA)", "nunchaku"),
 ]
@@ -1614,10 +1616,25 @@ def create_layout(
                                     value=_initial_backend,
                                     label="Flux Backend",
                                     info=(
-                                        "SDNQ/sd.cpp: cross-platform, no HF token. "
+                                        "SDNQ/managed sd.cpp: cross-platform, no HF token. "
+                                        "Remote sd.cpp: use an external sd-server. "
                                         "Nunchaku: CUDA-only, HF token required."
                                     ),
                                     visible=_backend_visible,
+                                )
+                                outside_text_flux_sdcpp_remote_url = gr.Textbox(
+                                    value=saved_settings.get(
+                                        "outside_text_flux_sdcpp_remote_url", ""
+                                    ),
+                                    label="Remote sd.cpp URL",
+                                    placeholder="http://127.0.0.1:1234",
+                                    info=(
+                                        "Base URL of an already-running sd-server loaded "
+                                        "with the selected Flux model. Sent without "
+                                        "authentication, so keep it on a trusted network."
+                                    ),
+                                    visible=_backend_visible
+                                    and _initial_backend == "sdcpp_remote",
                                 )
                                 outside_text_flux_residual_diff_threshold = gr.Slider(
                                     0.0,
@@ -2233,6 +2250,7 @@ def create_layout(
             outside_text_seed,
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
+            outside_text_flux_sdcpp_remote_url,
             outside_text_flux_low_vram,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
@@ -2356,6 +2374,7 @@ def create_layout(
             outside_text_inpainting_method,
             outside_text_flux_backend,
             outside_text_flux_backend_state,
+            outside_text_flux_sdcpp_remote_url,
             outside_text_flux_low_vram,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant,
@@ -2478,6 +2497,7 @@ def create_layout(
             outside_text_seed,
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
+            outside_text_flux_sdcpp_remote_url,
             outside_text_flux_low_vram,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
@@ -2604,6 +2624,7 @@ def create_layout(
             outside_text_seed,
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
+            outside_text_flux_sdcpp_remote_url,
             outside_text_flux_low_vram,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
@@ -2958,6 +2979,9 @@ def create_layout(
 
             show_low_vram = (is_klein or is_kontext) and backend_value == "sdnq"
             show_sdcpp_cache = (is_klein or is_kontext) and backend_value == "sdcpp"
+            show_remote_url = (
+                is_klein or is_kontext
+            ) and backend_value == "sdcpp_remote"
             available_text_encoder_quants = flux_sdcpp_text_encoder_quants(method)
             text_encoder_quants = (
                 available_text_encoder_quants
@@ -2990,6 +3014,7 @@ def create_layout(
                     value=backend_value,
                 ),
                 backend_value,
+                gr.update(visible=show_remote_url),
                 gr.update(visible=show_low_vram),
                 gr.update(visible=show_sdcpp_cache),
                 gr.update(
@@ -3034,6 +3059,7 @@ def create_layout(
             outputs=[
                 outside_text_flux_backend,
                 outside_text_flux_backend_state,
+                outside_text_flux_sdcpp_remote_url,
                 outside_text_flux_low_vram,
                 outside_text_flux_sdcpp_cache_mode,
                 outside_text_flux_sdcpp_diffusion_quant,
@@ -3092,6 +3118,9 @@ def create_layout(
             backend_value = flux_valid_backend(method, backend)
             show_low_vram = (is_klein or is_kontext) and backend_value == "sdnq"
             show_sdcpp_cache = (is_klein or is_kontext) and backend_value == "sdcpp"
+            show_remote_url = (
+                is_klein or is_kontext
+            ) and backend_value == "sdcpp_remote"
             text_encoder_quants = flux_sdcpp_text_encoder_quants(method)
             text_encoder_quant_value = flux_sdcpp_valid_text_encoder_quant(
                 method, current_text_encoder_quant
@@ -3103,6 +3132,7 @@ def create_layout(
                     visible=is_klein or is_kontext,
                 ),
                 backend_value,
+                gr.update(visible=show_remote_url),
                 gr.update(visible=show_low_vram),
                 gr.update(visible=show_sdcpp_cache),
                 gr.update(visible=show_sdcpp_cache),
@@ -3128,6 +3158,7 @@ def create_layout(
             outputs=[
                 outside_text_flux_backend,
                 outside_text_flux_backend_state,
+                outside_text_flux_sdcpp_remote_url,
                 outside_text_flux_low_vram,
                 outside_text_flux_sdcpp_cache_mode,
                 outside_text_flux_sdcpp_diffusion_quant,

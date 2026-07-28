@@ -129,7 +129,8 @@ class UIOutsideTextSettings:
     inpainting_method: str = (
         "flux_klein_4b"  # flux_klein_9b, flux_klein_4b, flux_kontext, opencv, none
     )
-    flux_backend: str = "sdnq"  # "sdcpp", "sdnq", "nunchaku" (Kontext only)
+    flux_backend: str = "sdnq"  # "sdcpp", "sdcpp_remote", "sdnq", "nunchaku"
+    flux_sdcpp_remote_url: str = ""  # Base URL for the "sdcpp_remote" backend
     flux_low_vram: bool = False  # Use CPU offload for SDNQ
     flux_sdcpp_cache_mode: str = "none"
     flux_sdcpp_diffusion_quant: str = "Q4_K_M"
@@ -291,6 +292,7 @@ class UIConfigState:
             "outside_text_huggingface_token": self.outside_text.huggingface_token,
             "outside_text_inpainting_method": self.outside_text.inpainting_method,
             "outside_text_flux_backend": self.outside_text.flux_backend,
+            "outside_text_flux_sdcpp_remote_url": self.outside_text.flux_sdcpp_remote_url,
             "outside_text_flux_low_vram": self.outside_text.flux_low_vram,
             "outside_text_flux_sdcpp_cache_mode": self.outside_text.flux_sdcpp_cache_mode,
             "outside_text_flux_sdcpp_diffusion_quant": self.outside_text.flux_sdcpp_diffusion_quant,
@@ -450,6 +452,10 @@ class UIConfigState:
                 flux_backend=data.get(
                     "outside_text_flux_backend",
                     defaults.get("outside_text_flux_backend", "sdnq"),
+                ),
+                flux_sdcpp_remote_url=data.get(
+                    "outside_text_flux_sdcpp_remote_url",
+                    defaults.get("outside_text_flux_sdcpp_remote_url", ""),
                 ),
                 flux_low_vram=data.get("outside_text_flux_low_vram", False),
                 flux_sdcpp_cache_mode=data.get(
@@ -842,6 +848,7 @@ def map_ui_to_backend_config(
         huggingface_token=ui_state.outside_text.huggingface_token,
         inpainting_method=ui_state.outside_text.inpainting_method,
         flux_backend=ui_state.outside_text.flux_backend,
+        flux_sdcpp_remote_url=ui_state.outside_text.flux_sdcpp_remote_url,
         flux_low_vram=ui_state.outside_text.flux_low_vram,
         flux_sdcpp_cache_mode=ui_state.outside_text.flux_sdcpp_cache_mode,
         flux_sdcpp_diffusion_quant=ui_state.outside_text.flux_sdcpp_diffusion_quant,
