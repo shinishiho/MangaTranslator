@@ -664,12 +664,17 @@ def finish_outside_text_work(
                     luminance_correction=config.outside_text.flux_luminance_correction,
                     upscale_small_crops=config.outside_text.flux_upscale_small_crops,
                     backend=backend,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
                     verbose=verbose,
                 )
-                backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
+                backend_label = {
+                    "sdcpp": "sd.cpp (managed)",
+                    "sdcpp_remote": "Remote sd.cpp",
+                    "sdnq": "SDNQ",
+                }[backend]
                 log_message(
                     f"Using Flux.2 Klein 9B ({backend_label}) for inpainting",
                     verbose=verbose,
@@ -692,12 +697,17 @@ def finish_outside_text_work(
                     luminance_correction=config.outside_text.flux_luminance_correction,
                     upscale_small_crops=config.outside_text.flux_upscale_small_crops,
                     backend=backend,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
                     verbose=verbose,
                 )
-                backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
+                backend_label = {
+                    "sdcpp": "sd.cpp (managed)",
+                    "sdcpp_remote": "Remote sd.cpp",
+                    "sdnq": "SDNQ",
+                }[backend]
                 log_message(
                     f"Using Flux.2 Klein 4B ({backend_label}) for inpainting",
                     verbose=verbose,
@@ -720,6 +730,7 @@ def finish_outside_text_work(
                     num_inference_steps=config.outside_text.flux_num_inference_steps,
                     residual_diff_threshold=config.outside_text.flux_residual_diff_threshold,
                     backend=backend,
+                    sdcpp_remote_url=config.outside_text.flux_sdcpp_remote_url,
                     low_vram=low_vram,
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
@@ -727,7 +738,8 @@ def finish_outside_text_work(
                 )
                 backend_label = {
                     "sdnq": "SDNQ",
-                    "sdcpp": "sd.cpp",
+                    "sdcpp": "sd.cpp (managed)",
+                    "sdcpp_remote": "Remote sd.cpp",
                     "nunchaku": "Nunchaku",
                 }[backend]
                 log_message(

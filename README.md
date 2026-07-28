@@ -194,6 +194,36 @@ If you want to use the OSB text pipeline, you need a Hugging Face token with acc
    - Env var (alternative): set `HF_TOKEN`
 5. Save config to preserve the token across sessions
 
+### Remote stable-diffusion.cpp FLUX backend (optional)
+
+MangaTranslator can use an already-running
+[`sd-server`](https://github.com/leejet/stable-diffusion.cpp) instead of
+downloading FLUX GGUF files and managing the server process itself.
+
+1. Start one `sd-server` with the FLUX model matching the selected inpainting
+   method (`flux_klein_4b`, `flux_klein_9b`, or `flux_kontext`). For example:
+
+   ```bash
+   sd-server --listen-ip 127.0.0.1 --listen-port 1234 <matching model arguments>
+   ```
+
+2. In the Web UI, select **Remote sd.cpp** as the Flux Backend and enter
+   `http://127.0.0.1:1234` in **Remote sd.cpp URL**.
+3. For CLI use, pass `--osb-flux-backend sdcpp_remote` together with
+   `--osb-flux-sdcpp-remote-url`, or set
+   `MANGA_TRANSLATOR_FLUX_SDCPP_URL`.
+
+The app checks `<base-url>/v1/models`, submits work to
+`<base-url>/sdcpp/v1/img_gen`, and polls the job endpoint returned by the
+server. It does not download models for, start, or stop a remote server. A
+failed remote job uses the existing OpenCV fallback for the affected region.
+
+> [!WARNING]
+> `sd-server` does not provide authentication through this integration. Keep it
+> on localhost or a trusted private network, or protect it at the network/proxy
+> layer. The upstream project also warns that its API can change frequently, so
+> use a compatible server version when upgrading.
+
 ## Run
 
 ### Web UI (Gradio)
@@ -229,6 +259,12 @@ python main.py --input <folder_path> --batch \
 python main.py --input <image_path> \
   --font-dir "fonts/Komika" --provider Google --google-api-key <AI...> \
   --osb-enable --osb-font-dir "fonts/Clementine"
+
+# OSB inpainting through a separately managed stable-diffusion.cpp server
+python main.py --input <image_path> --cleaning-only \
+  --osb-enable --osb-inpainting-method flux_klein_4b \
+  --osb-flux-backend sdcpp_remote \
+  --osb-flux-sdcpp-remote-url http://127.0.0.1:1234
 
 # Cleaning-only mode (no translation/text rendering)
 python main.py --input <image_path> --cleaning-only

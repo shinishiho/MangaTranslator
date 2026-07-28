@@ -217,6 +217,9 @@ DEFAULT_SETTINGS = {
     "outside_text_huggingface_token": "",
     "outside_text_inpainting_method": "flux_klein_4b",
     "outside_text_flux_backend": "sdnq",
+    "outside_text_flux_sdcpp_remote_url": os.environ.get(
+        "MANGA_TRANSLATOR_FLUX_SDCPP_URL", ""
+    ),
     "outside_text_flux_low_vram": False,
     "outside_text_flux_sdcpp_cache_mode": "none",
     "outside_text_flux_sdcpp_diffusion_quant": "Q4_K_M",
@@ -341,6 +344,7 @@ CANONICAL_CONFIG_KEY_ORDER: List[str] = [
     "outside_text_huggingface_token",
     "outside_text_inpainting_method",
     "outside_text_flux_backend",
+    "outside_text_flux_sdcpp_remote_url",
     "outside_text_flux_low_vram",
     "outside_text_flux_sdcpp_cache_mode",
     "outside_text_flux_sdcpp_diffusion_quant",
@@ -513,6 +517,11 @@ def get_saved_settings() -> Dict[str, Any]:
             for key in settings.keys():
                 if key in saved_config:
                     settings[key] = saved_config[key]
+
+            if not settings.get("outside_text_flux_sdcpp_remote_url"):
+                settings["outside_text_flux_sdcpp_remote_url"] = os.environ.get(
+                    "MANGA_TRANSLATOR_FLUX_SDCPP_URL", ""
+                )
 
             if "provider_models" not in settings:
                 settings["provider_models"] = DEFAULT_SETTINGS["provider_models"].copy()

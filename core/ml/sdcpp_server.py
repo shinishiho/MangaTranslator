@@ -12,12 +12,39 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import torch
 from PIL import Image
 
 from utils.exceptions import ModelError
 from utils.logging import log_message
+
+
+def normalize_sdcpp_server_url(url: str) -> str:
+    """Return a normalized HTTP(S) base URL for an external sd.cpp server."""
+    raw_url = (url or "").strip()
+    if not raw_url:
+        raise ModelError("Remote sd.cpp server URL is required.")
+
+    parsed = urlsplit(raw_url)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        raise ModelError(
+            "Remote sd.cpp server URL must be an absolute HTTP or HTTPS URL."
+        )
+    if parsed.username or parsed.password:
+        raise ModelError("Remote sd.cpp server URL must not contain credentials.")
+    if parsed.query or parsed.fragment:
+        raise ModelError(
+            "Remote sd.cpp server URL must not contain a query string or fragment."
+        )
+    try:
+        _validated_port = parsed.port
+    except ValueError as e:
+        raise ModelError(f"Remote sd.cpp server URL has an invalid port: {e}") from e
+
+    path = parsed.path.rstrip("/")
+    return urlunsplit((parsed.scheme.lower(), parsed.netloc, path, "", ""))
 
 
 def pil_to_base64_png(image_pil: Image.Image) -> str:
@@ -502,6 +529,26 @@ class SDCppServerManager:
                 return True
         except Exception:
             return False
+
+    def connect_remote_server(
+        self, base_url: str, model_key: str, verbose: bool = False
+    ) -> dict:
+        """Validate and return a non-owning handle to an external sd.cpp server."""
+        normalized_url = normalize_sdcpp_server_url(base_url)
+        if not self._server_ready(normalized_url):
+            raise ModelError(
+                f"Remote sd.cpp server is not reachable at {normalized_url}."
+            )
+
+        log_message(
+            f"Using external sd.cpp server for {model_key} at {normalized_url}.",
+            verbose=verbose,
+        )
+        return {
+            "url": normalized_url,
+            "model_key": model_key,
+            "remote": True,
+        }
 
     def _log_tail(self, log_path: Optional[Path], limit: int = 2000) -> str:
         if log_path is None or not log_path.exists():
