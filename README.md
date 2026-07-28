@@ -216,10 +216,8 @@ remote job falls back to OpenCV inpainting for that region.
 
 > **Point this at a single `sd-server`, not a load balancer.** `sd-server` keeps jobs in the
 > memory of the process that accepted them, so a proxy that spreads requests over several
-> replicas will sometimes route a poll to a replica that has never heard of the job and
-> answer `404`. Scattered failures are retried, but sustained ones fail the region. If you
-> host `sd-server` behind an autoscaler (Modal, Cloud Run, a k8s Service), pin it to one
-> replica or enable session affinity.
+> replicas will route job polls to a replica that has never heard of the job. If you host
+> `sd-server` behind an autoscaler, cap it at one replica or enable session affinity.
 
 #### Equivalent `sd-server` commands
 
