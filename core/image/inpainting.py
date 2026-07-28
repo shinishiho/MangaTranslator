@@ -57,6 +57,14 @@ def _prompt_value_to_device(value, device: torch.device):
     return value
 
 
+def _sdcpp_server_stopped(sdcpp_assets: Optional[dict]) -> bool:
+    """True when an sd.cpp handle points at a server process that has exited."""
+    if not sdcpp_assets:
+        return False
+    process = sdcpp_assets.get("process")
+    return process is None or process.poll() is not None
+
+
 def _pipeline_execution_device(pipeline, fallback: torch.device) -> torch.device:
     execution_device = getattr(pipeline, "_execution_device", None)
     if execution_device is None:
@@ -175,9 +183,9 @@ class FluxKontextInpainter:
 
     def load_models(self):
         """Load Flux Kontext models via model manager."""
-        # sd.cpp assets point at a server process that another stage may have
-        # shut down, so re-ensure it instead of trusting the cached handle.
-        if self.pipeline is not None and self.backend != "sdcpp":
+        # An sd.cpp handle can outlive the server another stage shut down, so
+        # restart it instead of posting to a dead port.
+        if self.pipeline is not None and not _sdcpp_server_stopped(self.sdcpp_assets):
             return
 
         # Flux does not fit alongside the OCR/upscale models on smaller GPUs
@@ -1087,9 +1095,9 @@ class FluxKleinInpainter:
 
     def load_models(self):
         """Load Flux Klein models via model manager."""
-        # sd.cpp assets point at a server process that another stage may have
-        # shut down, so re-ensure it instead of trusting the cached handle.
-        if self.pipeline is not None and self.backend != "sdcpp":
+        # An sd.cpp handle can outlive the server another stage shut down, so
+        # restart it instead of posting to a dead port.
+        if self.pipeline is not None and not _sdcpp_server_stopped(self.sdcpp_assets):
             return
 
         # Flux does not fit alongside the OCR/upscale models on smaller GPUs

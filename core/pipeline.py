@@ -2208,6 +2208,11 @@ async def _batch_translate_parallel(
     """
     total_images = len(image_files)
     n_workers = config.parallel_requests
+    # The model manager is process-wide, so one page unloading Flux or the aux
+    # models while another page still holds them frees nothing and can end up
+    # with two Flux copies in VRAM. A GPU that needs the swap cannot afford
+    # that, so run pages one at a time (LLM requests stay parallel).
+    page_workers = 1 if config.outside_text.flux_unload_between_stages else n_workers
     results = {
         "success_count": 0,
         "error_count": 0,
@@ -2226,9 +2231,15 @@ async def _batch_translate_parallel(
 
     log_message(
         f"Starting parallel batch processing: {total_images} images, "
-        f"{n_workers} parallel workers",
+        f"{page_workers} parallel workers",
         always_print=True,
     )
+    if page_workers != n_workers:
+        log_message(
+            "Unload Models Between Stages is enabled: processing pages one at a "
+            "time to keep only one set of models in VRAM.",
+            always_print=True,
+        )
 
     if getattr(config, "batch_parallel_within_pages", False):
         request_coordinator = BatchRequestCoordinator(
@@ -2318,7 +2329,7 @@ async def _batch_translate_parallel(
     if cancellation_manager and cancellation_manager.is_cancelled():
         raise CancellationError("Batch process cancelled by user.")
 
-    sem = asyncio.Semaphore(n_workers)
+    sem = asyncio.Semaphore(page_workers)
     results_lock = threading.Lock()
     cancelled = False
 
@@ -2445,7 +2456,7 @@ async def _batch_translate_parallel(
                 for event in ocr_text_ready_events:
                     event.set()
 
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+    with ThreadPoolExecutor(max_workers=page_workers) as executor:
         tasks = [_worker(img, i, executor) for i, img in enumerate(remaining, start=1)]
         gathered = await asyncio.gather(*tasks, return_exceptions=True)
 
