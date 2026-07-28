@@ -473,6 +473,19 @@ class ModelManager:
             verbose=verbose,
         )
 
+    def connect_flux_sdcpp_server(
+        self,
+        remote_url: str,
+        model_key: str = "flux_klein_4b",
+        verbose: bool = False,
+    ) -> dict:
+        """Connect to an external sd.cpp server without owning its lifecycle."""
+        return self.sdcpp_server_manager.connect_remote_server(
+            remote_url,
+            model_key,
+            verbose=verbose,
+        )
+
     def shutdown_sdcpp_server(self, model_key: str, verbose: bool = False) -> None:
         with self.flux_inference_lock:
             self.sdcpp_server_manager.shutdown_server(model_key, verbose=verbose)

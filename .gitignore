@@ -9,7 +9,9 @@ __pycache__/
 /.venv/
 /runtime/
 /deps/
-/tests/
+/tests/*
+!/tests/test_flux_remote_backend.py
+!/tests/test_sdcpp_remote.py
 start-webui.bat
 start-webui.sh
 *.otf

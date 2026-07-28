@@ -628,12 +628,21 @@ def main():
     parser.add_argument(
         "--osb-flux-backend",
         type=str,
-        choices=["sdcpp", "sdnq", "nunchaku"],
+        choices=["sdcpp", "sdcpp_remote", "sdnq", "nunchaku"],
         default="sdnq",
         help=(
             "Backend for Flux inpainting. "
-            "'sdcpp' and 'sdnq' support Flux Klein/Kontext; "
+            "'sdcpp', 'sdcpp_remote', and 'sdnq' support Flux Klein/Kontext; "
             "'nunchaku' is CUDA-only and Kontext-only."
+        ),
+    )
+    parser.add_argument(
+        "--osb-flux-sdcpp-remote-url",
+        type=str,
+        default=None,
+        help=(
+            "Base URL for --osb-flux-backend sdcpp_remote. "
+            "Defaults to MANGA_TRANSLATOR_FLUX_SDCPP_URL."
         ),
     )
     parser.add_argument(
@@ -867,6 +876,15 @@ def main():
     )
 
     args = parser.parse_args()
+
+    flux_sdcpp_remote_url = args.osb_flux_sdcpp_remote_url or os.environ.get(
+        "MANGA_TRANSLATOR_FLUX_SDCPP_URL", ""
+    )
+    if args.osb_flux_backend == "sdcpp_remote" and not flux_sdcpp_remote_url.strip():
+        parser.error(
+            "--osb-flux-backend sdcpp_remote requires "
+            "--osb-flux-sdcpp-remote-url or MANGA_TRANSLATOR_FLUX_SDCPP_URL."
+        )
 
     if args.osb_flux_backend == "nunchaku" and args.osb_inpainting_method in (
         "flux_klein_9b",
@@ -1185,6 +1203,7 @@ def main():
             huggingface_token=args.osb_hf_token or os.environ.get("HF_TOKEN", ""),
             inpainting_method=args.osb_inpainting_method,
             flux_backend=args.osb_flux_backend,
+            flux_sdcpp_remote_url=flux_sdcpp_remote_url,
             flux_low_vram=args.osb_flux_low_vram,
             flux_sdcpp_cache_mode=args.osb_flux_sdcpp_cache_mode,
             flux_sdcpp_diffusion_quant=args.osb_flux_sdcpp_diffusion_quant,
