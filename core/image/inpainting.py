@@ -211,11 +211,14 @@ class FluxKontextInpainter:
             self.transformer = None
             self.text_encoder_2 = None
         elif self.backend == "sdcpp_remote":
-            self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
-                self.sdcpp_remote_url,
-                "flux_kontext",
-                verbose=True,
-            )
+            # Connect once per session; the managed path caches its server too,
+            # so re-checking here would fail a region on any transient blip.
+            if self.sdcpp_assets is None:
+                self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
+                    self.sdcpp_remote_url,
+                    "flux_kontext",
+                    verbose=True,
+                )
             self.pipeline = self.sdcpp_assets
             self.transformer = None
             self.text_encoder_2 = None
@@ -1121,11 +1124,14 @@ class FluxKleinInpainter:
             return
 
         if self.backend == "sdcpp_remote":
-            self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
-                self.sdcpp_remote_url,
-                f"flux_klein_{self.variant}",
-                verbose=self.verbose,
-            )
+            # Connect once per session; the managed path caches its server too,
+            # so re-checking here would fail a region on any transient blip.
+            if self.sdcpp_assets is None:
+                self.sdcpp_assets = self.manager.connect_flux_sdcpp_server(
+                    self.sdcpp_remote_url,
+                    f"flux_klein_{self.variant}",
+                    verbose=self.verbose,
+                )
             self.pipeline = self.sdcpp_assets
             return
 

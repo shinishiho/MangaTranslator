@@ -20,8 +20,12 @@ from PIL import Image
 from utils.exceptions import ModelError
 from utils.logging import log_message
 
-# Seconds to wait for an external sd.cpp server's health check.
+# Seconds to wait for an external sd.cpp server's health check, and how many
+# times to ask before declaring it unreachable.
 REMOTE_HEALTH_TIMEOUT = 60
+REMOTE_HEALTH_ATTEMPTS = 3
+# Consecutive failed job polls tolerated before a job is considered lost.
+POLL_FAILURE_LIMIT = 10
 
 
 def normalize_sdcpp_server_url(url: str) -> str:
@@ -161,8 +165,23 @@ def run_image_job(
     log_message("  - Waiting for sd.cpp server job...", always_print=True)
     deadline = time.monotonic() + timeout_sec
     next_log = time.monotonic() + 10
+    poll_failures = 0
     while time.monotonic() < deadline:
-        status = _json_request(poll_url, timeout=30)
+        try:
+            status = _json_request(poll_url, timeout=30)
+        except (OSError, ValueError) as e:
+            # A load-balanced server can route a poll to a replica that never
+            # saw this job, so a scattered failure is not fatal. Only give up
+            # once they stop being scattered.
+            poll_failures += 1
+            if poll_failures > POLL_FAILURE_LIMIT:
+                raise ModelError(
+                    f"sd.cpp job polling failed {poll_failures} times "
+                    f"in a row: {e}.{log_suffix}"
+                ) from e
+            time.sleep(1)
+            continue
+        poll_failures = 0
         state = status.get("status")
         if state == "completed":
             log_message(
@@ -540,8 +559,13 @@ class SDCppServerManager:
         """Validate and return a non-owning handle to an external sd.cpp server."""
         normalized_url = normalize_sdcpp_server_url(base_url)
         # Remote servers can be cold (a hosted one may boot on first request),
-        # so allow far more slack than the local start-up poll.
-        if not self._server_ready(normalized_url, timeout=REMOTE_HEALTH_TIMEOUT):
+        # so allow far more slack than the local start-up poll, and retry in
+        # case the first attempt is what triggers the boot.
+        reachable = any(
+            self._server_ready(normalized_url, timeout=REMOTE_HEALTH_TIMEOUT)
+            for _ in range(REMOTE_HEALTH_ATTEMPTS)
+        )
+        if not reachable:
             raise ModelError(
                 f"Remote sd.cpp server is not reachable at {normalized_url}."
             )
