@@ -534,6 +534,7 @@ def clean_speech_bubbles(
     inpaint_method: str = "flux_kontext",
     flux_backend: str = "sdnq",
     flux_low_vram: bool = False,
+    flux_unload_between_stages: bool = False,
     flux_sdcpp_cache_mode: str = "none",
     flux_sdcpp_diffusion_quant: str = "Q4_K_M",
     flux_sdcpp_text_encoder_quant: str = "",
@@ -863,6 +864,7 @@ def clean_speech_bubbles(
                     else max(0, int(flux_seed))
                 )
                 temp_files = []
+                inpainter = None
                 try:
                     if inpaint_method == "flux_klein_9b":
                         backend = flux_backend
@@ -878,6 +880,7 @@ def clean_speech_bubbles(
                             sdcpp_cache_mode=flux_sdcpp_cache_mode,
                             sdcpp_diffusion_quant=flux_sdcpp_diffusion_quant,
                             sdcpp_text_encoder_quant=flux_sdcpp_text_encoder_quant,
+                            unload_between_stages=flux_unload_between_stages,
                             verbose=verbose,
                         )
                     elif inpaint_method == "flux_klein_4b":
@@ -894,6 +897,7 @@ def clean_speech_bubbles(
                             sdcpp_cache_mode=flux_sdcpp_cache_mode,
                             sdcpp_diffusion_quant=flux_sdcpp_diffusion_quant,
                             sdcpp_text_encoder_quant=flux_sdcpp_text_encoder_quant,
+                            unload_between_stages=flux_unload_between_stages,
                             verbose=verbose,
                         )
                     else:
@@ -909,6 +913,7 @@ def clean_speech_bubbles(
                             sdcpp_cache_mode=flux_sdcpp_cache_mode,
                             sdcpp_diffusion_quant=flux_sdcpp_diffusion_quant,
                             sdcpp_text_encoder_quant=flux_sdcpp_text_encoder_quant,
+                            unload_between_stages=flux_unload_between_stages,
                         )
                     if request_coordinator is not None and len(colored_bubbles) > 1:
                         pil_working = _inpaint_colored_bubbles_with_coordinator(
@@ -995,6 +1000,15 @@ def clean_speech_bubbles(
                         always_print=True,
                     )
                 finally:
+                    # Free Flux VRAM before the pipeline reloads the aux models
+                    if inpainter is not None and inpainter.unload_between_stages:
+                        try:
+                            inpainter.unload_models()
+                        except Exception as e:
+                            log_message(
+                                f"Warning: failed to unload Flux models: {e}",
+                                verbose=verbose,
+                            )
                     for temp_file in temp_files:
                         if temp_file and os.path.exists(temp_file):
                             try:

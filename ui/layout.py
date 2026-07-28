@@ -1653,6 +1653,18 @@ def create_layout(
                                     info="Sequential CPU offload for SDNQ.",
                                     visible=_show_low_vram,
                                 )
+                                outside_text_flux_unload_between_stages = gr.Checkbox(
+                                    value=saved_settings.get(
+                                        "outside_text_flux_unload_between_stages", False
+                                    ),
+                                    label="Unload Models Between Stages",
+                                    info=(
+                                        "Swap the OCR/upscale models out of VRAM before Flux runs "
+                                        "and unload Flux afterwards. Slower (models reload each "
+                                        "stage), but avoids OOM when both cannot fit at once."
+                                    ),
+                                    visible=(_is_klein_model or _is_kontext),
+                                )
                                 outside_text_flux_sdcpp_cache_mode = gr.Radio(
                                     choices=[
                                         ("Spectrum", "spectrum"),
@@ -2234,6 +2246,7 @@ def create_layout(
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
             outside_text_flux_low_vram,
+            outside_text_flux_unload_between_stages,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
             outside_text_flux_sdcpp_text_encoder_quant_state,
@@ -2357,6 +2370,7 @@ def create_layout(
             outside_text_flux_backend,
             outside_text_flux_backend_state,
             outside_text_flux_low_vram,
+            outside_text_flux_unload_between_stages,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant,
             outside_text_flux_sdcpp_diffusion_quant_state,
@@ -2479,6 +2493,7 @@ def create_layout(
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
             outside_text_flux_low_vram,
+            outside_text_flux_unload_between_stages,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
             outside_text_flux_sdcpp_text_encoder_quant_state,
@@ -2605,6 +2620,7 @@ def create_layout(
             outside_text_inpainting_method,
             outside_text_flux_backend_state,
             outside_text_flux_low_vram,
+            outside_text_flux_unload_between_stages,
             outside_text_flux_sdcpp_cache_mode,
             outside_text_flux_sdcpp_diffusion_quant_state,
             outside_text_flux_sdcpp_text_encoder_quant_state,
@@ -2991,6 +3007,7 @@ def create_layout(
                 ),
                 backend_value,
                 gr.update(visible=show_low_vram),
+                gr.update(visible=(not is_no_flux)),
                 gr.update(visible=show_sdcpp_cache),
                 gr.update(
                     choices=[(quant, quant) for quant in FLUX_SDCPP_DIFFUSION_QUANTS],
@@ -3035,6 +3052,7 @@ def create_layout(
                 outside_text_flux_backend,
                 outside_text_flux_backend_state,
                 outside_text_flux_low_vram,
+                outside_text_flux_unload_between_stages,
                 outside_text_flux_sdcpp_cache_mode,
                 outside_text_flux_sdcpp_diffusion_quant,
                 outside_text_flux_sdcpp_diffusion_quant_state,

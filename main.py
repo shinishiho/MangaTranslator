@@ -642,6 +642,14 @@ def main():
         help="Enable CPU offload for Flux SDNQ models (reduces VRAM usage)",
     )
     parser.add_argument(
+        "--osb-flux-unload-between-stages",
+        action="store_true",
+        help=(
+            "Unload the OCR/upscale models before Flux inpainting and unload Flux "
+            "afterwards. Slower, but avoids OOM when both cannot fit in VRAM."
+        ),
+    )
+    parser.add_argument(
         "--osb-flux-sdcpp-cache-mode",
         type=str,
         choices=["spectrum", "cache-dit", "taylorseer", "dbcache", "none"],
@@ -1186,6 +1194,7 @@ def main():
             inpainting_method=args.osb_inpainting_method,
             flux_backend=args.osb_flux_backend,
             flux_low_vram=args.osb_flux_low_vram,
+            flux_unload_between_stages=args.osb_flux_unload_between_stages,
             flux_sdcpp_cache_mode=args.osb_flux_sdcpp_cache_mode,
             flux_sdcpp_diffusion_quant=args.osb_flux_sdcpp_diffusion_quant,
             flux_sdcpp_text_encoder_quant=args.osb_flux_sdcpp_text_encoder_quant or "",

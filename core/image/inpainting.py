@@ -99,6 +99,7 @@ class FluxKontextInpainter:
         sdcpp_cache_mode: str = "none",
         sdcpp_diffusion_quant: str = "",
         sdcpp_text_encoder_quant: str = "",
+        unload_between_stages: bool = False,
     ):
         """Initialize the Flux Kontext Inpaint class.
 
@@ -112,6 +113,8 @@ class FluxKontextInpainter:
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
             sdcpp_diffusion_quant: Flux sd.cpp diffusion model quant.
             sdcpp_text_encoder_quant: Flux sd.cpp T5 text encoder quant.
+            unload_between_stages: If True, swap the OCR/upscale models out of
+                VRAM before loading Flux (for GPUs that cannot hold both).
         """
         self.DEVICE = device if device is not None else get_best_device()
         self.DTYPE = get_best_dtype(self.DEVICE)
@@ -125,6 +128,7 @@ class FluxKontextInpainter:
                 "Must be 'nunchaku', 'sdnq', or 'sdcpp'."
             )
         self.low_vram = low_vram
+        self.unload_between_stages = unload_between_stages
         self.sdcpp_cache_mode = sdcpp_cache_mode
         self.sdcpp_diffusion_quant = sdcpp_diffusion_quant or flux_sdcpp_quant_default(
             "flux_kontext", "diffusion_model"
@@ -171,8 +175,14 @@ class FluxKontextInpainter:
 
     def load_models(self):
         """Load Flux Kontext models via model manager."""
-        if self.pipeline is not None:
+        # sd.cpp assets point at a server process that another stage may have
+        # shut down, so re-ensure it instead of trusting the cached handle.
+        if self.pipeline is not None and self.backend != "sdcpp":
             return
+
+        # Flux does not fit alongside the OCR/upscale models on smaller GPUs
+        if self.unload_between_stages:
+            self.manager.unload_aux_models(verbose=True)
 
         if self.huggingface_token:
             self.manager.set_flux_hf_token(self.huggingface_token)
@@ -208,12 +218,16 @@ class FluxKontextInpainter:
 
     def unload_models(self):
         """Unload Flux.1 Kontext models via model manager to free up memory."""
+        was_loaded = self.pipeline is not None
         self.pipeline = None
         self.transformer = None
         self.text_encoder_2 = None
         self.sdcpp_assets = None
         self._prompt_embeds_cpu = None
         self._pooled_prompt_embeds_cpu = None
+
+        if not was_loaded:
+            return
 
         if self.backend == "sdnq":
             self.manager.unload_flux_kontext_sdnq_models()
@@ -1015,6 +1029,7 @@ class FluxKleinInpainter:
         sdcpp_cache_mode: str = "none",
         sdcpp_diffusion_quant: str = "",
         sdcpp_text_encoder_quant: str = "",
+        unload_between_stages: bool = False,
         verbose: bool = False,
     ):
         """Initialize the Flux Klein Inpainter.
@@ -1031,6 +1046,8 @@ class FluxKleinInpainter:
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
             sdcpp_diffusion_quant: Flux sd.cpp diffusion model quant.
             sdcpp_text_encoder_quant: Flux sd.cpp Qwen text encoder quant.
+            unload_between_stages: If True, swap the OCR/upscale models out of
+                VRAM before loading Flux (for GPUs that cannot hold both).
             verbose: Whether to print verbose logging.
         """
         self.variant = variant.lower()
@@ -1045,6 +1062,7 @@ class FluxKleinInpainter:
 
         self.num_inference_steps = num_inference_steps
         self.low_vram = low_vram
+        self.unload_between_stages = unload_between_stages
         self.luminance_correction = luminance_correction
         self.upscale_small_crops = upscale_small_crops
         self.sdcpp_cache_mode = sdcpp_cache_mode
@@ -1069,8 +1087,14 @@ class FluxKleinInpainter:
 
     def load_models(self):
         """Load Flux Klein models via model manager."""
-        if self.pipeline is not None:
+        # sd.cpp assets point at a server process that another stage may have
+        # shut down, so re-ensure it instead of trusting the cached handle.
+        if self.pipeline is not None and self.backend != "sdcpp":
             return
+
+        # Flux does not fit alongside the OCR/upscale models on smaller GPUs
+        if self.unload_between_stages:
+            self.manager.unload_aux_models(verbose=self.verbose)
 
         if self.huggingface_token:
             self.manager.set_flux_hf_token(self.huggingface_token)
@@ -1098,10 +1122,13 @@ class FluxKleinInpainter:
 
     def unload_models(self):
         """Unload Flux.2 Klein models via model manager to free up memory."""
+        was_loaded = self.pipeline is not None
         self.pipeline = None
         self.sdcpp_assets = None
         self._prompt_embeds_cpu = None
         self._pooled_prompt_embeds_cpu = None
+        if not was_loaded:
+            return
         if self.backend == "sdcpp":
             self.manager.shutdown_sdcpp_server(f"flux_klein_{self.variant}")
         else:

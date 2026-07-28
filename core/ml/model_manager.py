@@ -1479,6 +1479,16 @@ class ModelManager:
         if models_unloaded:
             log_message("Flux.2 Klein models unloaded.", verbose=verbose)
 
+    def unload_aux_models(self, verbose: bool = False):
+        """Unload OCR/detection and upscale models to make room for Flux.
+
+        Flux and the auxiliary models do not fit in VRAM together on smaller
+        GPUs. The stages that need them reload them lazily afterwards.
+        """
+        self.unload_ocr_models(verbose=verbose)
+        if self.is_loaded(ModelType.UPSCALE) or self.is_loaded(ModelType.UPSCALE_LITE):
+            self.unload_upscale_models(verbose=verbose)
+
     def unload_all(self, verbose: bool = False):
         """Unload all models and free all GPU memory."""
         log_message("Unloading all models...", verbose=verbose)

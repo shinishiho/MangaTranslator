@@ -667,6 +667,7 @@ def finish_outside_text_work(
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
+                    unload_between_stages=config.outside_text.flux_unload_between_stages,
                     verbose=verbose,
                 )
                 backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
@@ -695,6 +696,7 @@ def finish_outside_text_work(
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
+                    unload_between_stages=config.outside_text.flux_unload_between_stages,
                     verbose=verbose,
                 )
                 backend_label = "sd.cpp" if backend == "sdcpp" else "SDNQ"
@@ -724,6 +726,7 @@ def finish_outside_text_work(
                     sdcpp_cache_mode=config.outside_text.flux_sdcpp_cache_mode,
                     sdcpp_diffusion_quant=config.outside_text.flux_sdcpp_diffusion_quant,
                     sdcpp_text_encoder_quant=config.outside_text.flux_sdcpp_text_encoder_quant,
+                    unload_between_stages=config.outside_text.flux_unload_between_stages,
                 )
                 backend_label = {
                     "sdnq": "SDNQ",
@@ -1615,6 +1618,15 @@ def finish_outside_text_work(
                     always_print=True,
                 )
         finally:
+            # Free Flux VRAM before the pipeline reloads the aux models
+            if inpainter is not None and inpainter.unload_between_stages:
+                try:
+                    inpainter.unload_models()
+                except Exception as e:
+                    log_message(
+                        f"Warning: failed to unload Flux models: {e}",
+                        verbose=verbose,
+                    )
             for temp_file in temp_files:
                 if temp_file and os.path.exists(temp_file):
                     try:
