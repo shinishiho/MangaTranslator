@@ -20,6 +20,9 @@ from PIL import Image
 from utils.exceptions import ModelError
 from utils.logging import log_message
 
+# Seconds to wait for an external sd.cpp server's health check.
+REMOTE_HEALTH_TIMEOUT = 60
+
 
 def normalize_sdcpp_server_url(url: str) -> str:
     """Return a normalized HTTP(S) base URL for an external sd.cpp server."""
@@ -524,9 +527,9 @@ class SDCppServerManager:
             sock.bind(("127.0.0.1", 0))
             return int(sock.getsockname()[1])
 
-    def _server_ready(self, base_url: str) -> bool:
+    def _server_ready(self, base_url: str, timeout: float = 2) -> bool:
         try:
-            with urllib.request.urlopen(f"{base_url}/v1/models", timeout=2):
+            with urllib.request.urlopen(f"{base_url}/v1/models", timeout=timeout):
                 return True
         except Exception:
             return False
@@ -536,7 +539,9 @@ class SDCppServerManager:
     ) -> dict:
         """Validate and return a non-owning handle to an external sd.cpp server."""
         normalized_url = normalize_sdcpp_server_url(base_url)
-        if not self._server_ready(normalized_url):
+        # Remote servers can be cold (a hosted one may boot on first request),
+        # so allow far more slack than the local start-up poll.
+        if not self._server_ready(normalized_url, timeout=REMOTE_HEALTH_TIMEOUT):
             raise ModelError(
                 f"Remote sd.cpp server is not reachable at {normalized_url}."
             )
