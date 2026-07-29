@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, Union
 
 from core.config import MangaTranslatorConfig, RenderingConfig, TranslationConfig
-from utils.exceptions import ModelError, ValidationError
+from utils.exceptions import ValidationError
 from utils.urls import normalize_sdcpp_server_url
 
 SETTING_CONSTRAINTS: Dict[str, Tuple[float, float]] = {
@@ -318,7 +318,7 @@ def validate_config(config: MangaTranslatorConfig) -> None:
     if config.outside_text.flux_backend == "sdcpp_remote":
         try:
             normalize_sdcpp_server_url(config.outside_text.flux_sdcpp_remote_url)
-        except ModelError as e:
+        except ValueError as e:
             raise ValidationError(str(e)) from e
 
 

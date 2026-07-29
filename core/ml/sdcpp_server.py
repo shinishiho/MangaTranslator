@@ -530,7 +530,10 @@ class SDCppServerManager:
         self, base_url: str, model_key: str, verbose: bool = False
     ) -> dict:
         """Validate and return a non-owning handle to an external sd.cpp server."""
-        normalized_url = normalize_sdcpp_server_url(base_url)
+        try:
+            normalized_url = normalize_sdcpp_server_url(base_url)
+        except ValueError as e:
+            raise ModelError(str(e)) from e
         try:
             with urllib.request.urlopen(
                 f"{normalized_url}/v1/models", timeout=REQUEST_TIMEOUT
