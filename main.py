@@ -639,7 +639,7 @@ def main():
     parser.add_argument(
         "--osb-flux-sdcpp-remote-url",
         type=str,
-        default=None,
+        default="",
         help="Base URL of sd-server, for --osb-flux-backend sdcpp_remote.",
     )
     parser.add_argument(

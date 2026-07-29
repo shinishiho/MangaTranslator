@@ -45,18 +45,10 @@ def normalize_sdcpp_server_url(url: str) -> str:
     )
 
 
-# JPEG q95 on the wire: a remote server pays per byte twice, local reads loopback.
-REMOTE_WIRE_QUALITY = 95
-
-
-def pil_to_base64_image(image_pil: Image.Image, server: dict) -> str:
-    """Encode a reference image for `server`, lossless only where it is free."""
+def pil_to_base64_png(image_pil: Image.Image) -> str:
     image_rgb = image_pil.convert("RGB")
     buffer = io.BytesIO()
-    if server.get("remote"):
-        image_rgb.save(buffer, format="JPEG", quality=REMOTE_WIRE_QUALITY)
-    else:
-        image_rgb.save(buffer, format="PNG")
+    image_rgb.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
@@ -142,15 +134,7 @@ def run_image_job(
     log_path = server.get("log_path")
     log_suffix = f" Log: {log_path}" if log_path else ""
     log_offset = _log_offset(log_path)
-    # JPEG over WebP: WebP is a build-time option in sd.cpp, JPEG is always there.
-    if server.get("remote"):
-        payload = {
-            **payload,
-            "output_format": "jpeg",
-            "output_compression": REMOTE_WIRE_QUALITY,
-        }
-    else:
-        payload = {**payload, "output_format": "png"}
+    payload = {**payload, "output_format": "png", "output_compression": 100}
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
     job = _json_request(

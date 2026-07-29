@@ -12,7 +12,7 @@ from core.device import empty_cache, get_best_device, get_best_dtype
 from core.ml.model_manager import get_model_manager
 from core.ml.sdcpp_server import (
     normalize_sdcpp_server_url,
-    pil_to_base64_image,
+    pil_to_base64_png,
     run_image_job,
 )
 from utils.exceptions import ModelError
@@ -279,7 +279,7 @@ class FluxKontextInpainter:
             "height": int(height),
             "seed": int(seed),
             "batch_count": 1,
-            "ref_images": [pil_to_base64_image(image_pil, self.sdcpp_assets)],
+            "ref_images": [pil_to_base64_png(image_pil)],
             "sample_params": {
                 "sample_method": "euler",
                 "sample_steps": int(self.num_inference_steps),
@@ -1373,7 +1373,7 @@ class FluxKleinInpainter:
             "height": int(height),
             "seed": int(seed),
             "batch_count": 1,
-            "ref_images": [pil_to_base64_image(image_pil, self.sdcpp_assets)],
+            "ref_images": [pil_to_base64_png(image_pil)],
             "sample_params": {
                 "sample_method": "euler",
                 "sample_steps": int(self.num_inference_steps),
