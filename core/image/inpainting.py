@@ -12,7 +12,7 @@ from core.device import empty_cache, get_best_device, get_best_dtype
 from core.ml.model_manager import get_model_manager
 from core.ml.sdcpp_server import (
     normalize_sdcpp_server_url,
-    pil_to_base64_png,
+    pil_to_base64_image,
     run_image_job,
 )
 from utils.exceptions import ModelError
@@ -280,7 +280,7 @@ class FluxKontextInpainter:
             "height": int(height),
             "seed": int(seed),
             "batch_count": 1,
-            "ref_images": [pil_to_base64_png(image_pil)],
+            "ref_images": [pil_to_base64_image(image_pil, self.sdcpp_assets)],
             "sample_params": {
                 "sample_method": "euler",
                 "sample_steps": int(self.num_inference_steps),
@@ -290,8 +290,6 @@ class FluxKontextInpainter:
                     "distilled_guidance": float(self.guidance_scale),
                 },
             },
-            "output_format": "png",
-            "output_compression": 100,
         }
         return run_image_job(
             self.sdcpp_assets, payload, verbose=verbose, timeout_sec=900
@@ -1379,7 +1377,7 @@ class FluxKleinInpainter:
             "height": int(height),
             "seed": int(seed),
             "batch_count": 1,
-            "ref_images": [pil_to_base64_png(image_pil)],
+            "ref_images": [pil_to_base64_image(image_pil, self.sdcpp_assets)],
             "sample_params": {
                 "sample_method": "euler",
                 "sample_steps": int(self.num_inference_steps),
@@ -1389,8 +1387,6 @@ class FluxKleinInpainter:
                     "distilled_guidance": float(self.KLEIN_GUIDANCE_SCALE),
                 },
             },
-            "output_format": "png",
-            "output_compression": 100,
         }
         return run_image_job(
             self.sdcpp_assets, payload, verbose=verbose, timeout_sec=900

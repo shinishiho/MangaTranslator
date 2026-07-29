@@ -51,11 +51,30 @@ def normalize_sdcpp_server_url(url: str) -> str:
     )
 
 
-def pil_to_base64_png(image_pil: Image.Image) -> str:
+# A remote server pays for every byte twice: once on the wire, once decoding a
+# multi-megabyte PNG on a billed container. JPEG q95 costs ~12/255 on the worst
+# screentone pixel and nothing visible, so remote jobs trade lossless for small.
+# A local server reads over loopback, where PNG is free.
+REMOTE_WIRE_QUALITY = 95
+
+
+def pil_to_base64_image(image_pil: Image.Image, server: dict) -> str:
+    """Encode a reference image for `server`, lossless only where it is free."""
     image_rgb = image_pil.convert("RGB")
     buffer = io.BytesIO()
-    image_rgb.save(buffer, format="PNG")
+    if server.get("remote"):
+        image_rgb.save(buffer, format="JPEG", quality=REMOTE_WIRE_QUALITY)
+    else:
+        image_rgb.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _wire_output_options(server: dict) -> dict:
+    """Result encoding for `server`. JPEG over WebP: WebP is a build-time option
+    in sd.cpp, PNG and JPEG are always compiled in."""
+    if server.get("remote"):
+        return {"output_format": "jpeg", "output_compression": REMOTE_WIRE_QUALITY}
+    return {"output_format": "png", "output_compression": 100}
 
 
 def _json_request(
@@ -140,6 +159,7 @@ def run_image_job(
     log_path = server.get("log_path")
     log_suffix = f" Log: {log_path}" if log_path else ""
     log_offset = _log_offset(log_path)
+    payload = {**payload, **_wire_output_options(server)}
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
     job = _json_request(f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=30)
