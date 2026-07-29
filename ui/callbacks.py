@@ -50,10 +50,15 @@ def _radio_choices(values):
 
 def _flux_backend_choices(method: str):
     if method in ("flux_klein_9b", "flux_klein_4b"):
-        return [("sd.cpp", "sdcpp"), ("SDNQ", "sdnq")]
+        return [
+            ("Local sd.cpp", "sdcpp"),
+            ("Remote sd.cpp", "sdcpp_remote"),
+            ("SDNQ", "sdnq"),
+        ]
     if method == "flux_kontext":
         return [
-            ("sd.cpp", "sdcpp"),
+            ("Local sd.cpp", "sdcpp"),
+            ("Remote sd.cpp", "sdcpp_remote"),
             ("SDNQ", "sdnq"),
             ("Nunchaku (CUDA)", "nunchaku"),
         ]
@@ -168,6 +173,7 @@ def _build_ui_state_from_args(args: tuple, is_batch: bool) -> UIConfigState:
         outside_text_seed_val,
         outside_text_inpainting_method_val,
         outside_text_flux_backend_val,
+        outside_text_flux_sdcpp_remote_url_val,
         outside_text_flux_low_vram_val,
         outside_text_flux_sdcpp_cache_mode_val,
         outside_text_flux_sdcpp_diffusion_quant_val,
@@ -248,6 +254,7 @@ def _build_ui_state_from_args(args: tuple, is_batch: bool) -> UIConfigState:
             huggingface_token=outside_text_huggingface_token_val,
             inpainting_method=outside_text_inpainting_method_val,
             flux_backend=outside_text_flux_backend_val,
+            flux_sdcpp_remote_url=outside_text_flux_sdcpp_remote_url_val,
             flux_low_vram=outside_text_flux_low_vram_val,
             flux_sdcpp_cache_mode=outside_text_flux_sdcpp_cache_mode_val,
             flux_sdcpp_diffusion_quant=outside_text_flux_sdcpp_diffusion_quant_val,
@@ -1083,6 +1090,7 @@ def handle_save_config_click(*args: Any) -> str:
         outside_text_seed_val,
         outside_text_inpainting_method_val,
         outside_text_flux_backend_val,
+        outside_text_flux_sdcpp_remote_url_val,
         outside_text_flux_low_vram_val,
         outside_text_flux_sdcpp_cache_mode_val,
         outside_text_flux_sdcpp_diffusion_quant_val,
@@ -1147,6 +1155,7 @@ def handle_save_config_click(*args: Any) -> str:
             huggingface_token=outside_text_huggingface_token_val,
             inpainting_method=outside_text_inpainting_method_val,
             flux_backend=outside_text_flux_backend_val,
+            flux_sdcpp_remote_url=outside_text_flux_sdcpp_remote_url_val,
             flux_low_vram=outside_text_flux_low_vram_val,
             flux_sdcpp_cache_mode=outside_text_flux_sdcpp_cache_mode_val,
             flux_sdcpp_diffusion_quant=outside_text_flux_sdcpp_diffusion_quant_val,
@@ -1553,6 +1562,10 @@ def handle_reset_defaults_click(fonts_base_dir: Path) -> List[gr.update]:
             ),
         ),
         default_ui_state.outside_text.flux_backend,
+        gr.update(
+            value=default_ui_state.outside_text.flux_sdcpp_remote_url,
+            visible=(default_ui_state.outside_text.flux_backend == "sdcpp_remote"),
+        ),
         default_ui_state.outside_text.flux_low_vram,
         default_ui_state.outside_text.flux_sdcpp_cache_mode,
         gr.update(

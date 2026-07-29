@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple, Union
 
 from core.config import MangaTranslatorConfig, RenderingConfig, TranslationConfig
 from utils.exceptions import ValidationError
+from utils.urls import normalize_sdcpp_server_url
 
 SETTING_CONSTRAINTS: Dict[str, Tuple[float, float]] = {
     "confidence": (0.1, 1.0),
@@ -314,6 +315,11 @@ def validate_config(config: MangaTranslatorConfig) -> None:
         and config.outside_text.flux_backend == "nunchaku"
     ):
         raise ValidationError("Nunchaku backend is only supported with Flux.1 Kontext.")
+    if config.outside_text.flux_backend == "sdcpp_remote":
+        try:
+            normalize_sdcpp_server_url(config.outside_text.flux_sdcpp_remote_url)
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
 
 
 def validate_zip_file(zip_path: Union[str, Path]) -> Path:

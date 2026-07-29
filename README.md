@@ -194,6 +194,76 @@ If you want to use the OSB text pipeline, you need a Hugging Face token with acc
    - Env var (alternative): set `HF_TOKEN`
 5. Save config to preserve the token across sessions
 
+### External stable-diffusion.cpp server setup (optional)
+
+If you want to manage a stable-diffusion.cpp server instance yourself (perhaps to use another machine with better GPU), you can use these launch commands:
+
+#### Models
+
+**Flux.2 Klein 4B** (`--osb-inpainting-method flux_klein_4b`):
+
+```bash
+sd-server --listen-ip 0.0.0.0 --listen-port 1234 \
+  --diffusion-model models/flux/sdcpp/flux-2-klein-4b-Q4_K_M.gguf \
+  --llm          models/flux/sdcpp/Qwen3-4B-UD-Q4_K_XL.gguf \
+  --vae          models/flux/sdcpp/flux2-vae.safetensors \
+  --fa --eager-load --offload-to-cpu \
+  --cfg-scale 1.0 --img-cfg-scale 1.0 --guidance 1.0 \
+  --sampling-method euler --steps 4
+```
+
+**Flux.2 Klein 9B** (`flux_klein_9b`) — same as above, but replace `--diffusion-model` and `--llm`:
+
+```bash
+  --diffusion-model models/flux/sdcpp/flux-2-klein-9b-Q4_K_M.gguf \
+  --llm          models/flux/sdcpp/Qwen3-8B-UD-Q4_K_XL.gguf \
+```
+
+**Flux.1 Kontext** (`flux_kontext`):
+
+```bash
+sd-server --listen-ip 0.0.0.0 --listen-port 1234 \
+  --diffusion-model models/flux/sdcpp/kontext/flux1-kontext-dev-Q4_K_M.gguf \
+  --clip_l       models/flux/sdcpp/kontext/clip_l.safetensors \
+  --t5xxl        models/flux/sdcpp/kontext/t5-v1_1-xxl-encoder-Q4_K_M.gguf \
+  --vae          models/flux/sdcpp/kontext/ae.safetensors \
+  --fa --eager-load --offload-to-cpu \
+  --cfg-scale 1.0 --img-cfg-scale 1.0 --guidance 2.5 \
+  --sampling-method euler --steps 8
+```
+
+Note: you will need to download stable-diffusion.cpp and model weights onto the machine running the server yourself.
+You can select any quantization level suitable to your hardware.
+
+**Weights.** Download the quant you want from Hugging Face:
+
+| Model               | Component    | Hugging Face repo                                                                                     | File                                                 |
+| ------------------- | ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Flux.2 Klein 4B** | Diffusion    | [unsloth/FLUX.2-klein-4B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF)                   | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF)                                 | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors`              |
+| **Flux.2 Klein 9B** | Diffusion    | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF)                   | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [unsloth/Qwen3-8B-GGUF](https://huggingface.co/unsloth/Qwen3-8B-GGUF)                                 | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors`              |
+| **Flux.1 Kontext**  | Diffusion    | [unsloth/FLUX.1-Kontext-dev-GGUF](https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF)             | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf)             | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | CLIP-L       | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders)         | `clip_l.safetensors`                                 |
+|                     | VAE          | [Comfy-Org/Lumina_Image_2.0_Repackaged](https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged) | `split_files/vae/ae.safetensors`                     |
+
+#### Cache modes
+
+When using the bundled sdcpp server, you can configure this in the Config tab.
+Equivalently, append this to your stable-diffusion.cpp server launch command.
+Ordered fastest/worst quality -> slowest/best quality. Warmup is 25% of the selected step count.
+
+| Cache Method | Flags                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `spectrum`   | `--cache-mode spectrum --cache-option warmup=W,window=2,stop=0.8`                              |
+| `cache-dit`  | `--cache-mode cache-dit --cache-option Fn=4,Bn=0,threshold=0.10,warmup=W --scm-policy dynamic` |
+| `taylorseer` | `--cache-mode taylorseer --cache-option Fn=4,Bn=0,warmup=W`                                    |
+| `dbcache`    | `--cache-mode dbcache --cache-option Fn=8,Bn=0,threshold=0.08,warmup=W`                        |
+| `none`       | _(blank)_                                                                                      |
+
 ## Run
 
 ### Web UI (Gradio)
@@ -229,6 +299,12 @@ python main.py --input <folder_path> --batch \
 python main.py --input <image_path> \
   --font-dir "fonts/Komika" --provider Google --google-api-key <AI...> \
   --osb-enable --osb-font-dir "fonts/Clementine"
+
+# Use external stable-diffusion.cpp server for Flux inpainting
+python main.py --input <image_path> --cleaning-only \
+  --osb-enable --osb-inpainting-method flux_klein_4b \
+  --osb-flux-backend sdcpp_remote \
+  --osb-flux-sdcpp-remote-url http(s)://<server-ip>:port
 
 # Cleaning-only mode (no translation/text rendering)
 python main.py --input <image_path> --cleaning-only

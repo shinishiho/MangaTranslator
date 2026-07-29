@@ -18,6 +18,10 @@ from PIL import Image
 
 from utils.exceptions import ModelError
 from utils.logging import log_message
+from utils.urls import normalize_sdcpp_server_url
+
+# Longer timeout for remote sd.cpp server
+REQUEST_TIMEOUT = 60
 
 
 def pil_to_base64_png(image_pil: Image.Image) -> str:
@@ -69,6 +73,23 @@ def _image_from_result(result: dict) -> Image.Image:
         raise ModelError(f"Failed to decode sd.cpp output image: {e}") from e
 
 
+def _model_id_from_listing(body: bytes) -> str:
+    """Best-effort model ids from a /v1/models body; "" if it says nothing useful."""
+    try:
+        listing = json.loads(body.decode("utf-8"))
+    except Exception:
+        return ""
+    entries = listing.get("data") if isinstance(listing, dict) else listing
+    if not isinstance(entries, list):
+        return ""
+    ids = sorted(
+        str(entry.get("id"))
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("id")
+    )
+    return ",".join(ids)
+
+
 def _log_offset(log_path) -> int:
     if log_path is None:
         return 0
@@ -111,7 +132,9 @@ def run_image_job(
     log_offset = _log_offset(log_path)
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
-    job = _json_request(f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=30)
+    job = _json_request(
+        f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=REQUEST_TIMEOUT
+    )
     if job.get("status") == "completed" or job.get("result") or job.get("images"):
         log_message(
             f"  - sd.cpp inference completed in {time.monotonic() - start:.1f}s.",
@@ -131,7 +154,7 @@ def run_image_job(
     deadline = time.monotonic() + timeout_sec
     next_log = time.monotonic() + 10
     while time.monotonic() < deadline:
-        status = _json_request(poll_url, timeout=30)
+        status = _json_request(poll_url, timeout=REQUEST_TIMEOUT)
         state = status.get("status")
         if state == "completed":
             log_message(
@@ -502,6 +525,33 @@ class SDCppServerManager:
                 return True
         except Exception:
             return False
+
+    def connect_remote_server(
+        self, base_url: str, model_key: str, verbose: bool = False
+    ) -> dict:
+        """Validate and return a non-owning handle to an external sd.cpp server."""
+        try:
+            normalized_url = normalize_sdcpp_server_url(base_url)
+        except ValueError as e:
+            raise ModelError(str(e)) from e
+        try:
+            with urllib.request.urlopen(
+                f"{normalized_url}/v1/models", timeout=REQUEST_TIMEOUT
+            ) as response:
+                listing = response.read()
+        except Exception as e:
+            raise ModelError(
+                f"Remote sd.cpp server is not reachable at {normalized_url}: {e}"
+            ) from e
+
+        served = _model_id_from_listing(listing)
+        served_suffix = f" (serving: {served})" if served else ""
+        log_message(
+            f"Using external sd.cpp server for {model_key} "
+            f"at {normalized_url}{served_suffix}.",
+            always_print=True,
+        )
+        return {"url": normalized_url, "model_key": model_key, "remote": True}
 
     def _log_tail(self, log_path: Optional[Path], limit: int = 2000) -> str:
         if log_path is None or not log_path.exists():
