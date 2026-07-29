@@ -12,37 +12,18 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit, urlunsplit
 
 import torch
 from PIL import Image
 
 from utils.exceptions import ModelError
 from utils.logging import log_message
+from utils.urls import normalize_sdcpp_server_url
 
 # Seconds to wait on any single sd.cpp request. A hosted server can be scaled to
 # zero and boot on the request that reaches it; a local one answers immediately
 # and never notices the wider ceiling.
 REQUEST_TIMEOUT = 60
-
-
-def normalize_sdcpp_server_url(url: str) -> str:
-    """Return a normalized HTTP(S) base URL for an external sd.cpp server."""
-    raw_url = (url or "").strip()
-    if not raw_url:
-        raise ModelError("Remote sd.cpp server URL is required.")
-
-    parsed = urlsplit(raw_url)
-    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
-        raise ModelError(
-            "Remote sd.cpp server URL must be an absolute HTTP or HTTPS URL."
-        )
-    if parsed.username or parsed.password:
-        raise ModelError("Remote sd.cpp server URL must not contain credentials.")
-
-    return urlunsplit(
-        (parsed.scheme.lower(), parsed.netloc, parsed.path.rstrip("/"), "", "")
-    )
 
 
 def pil_to_base64_png(image_pil: Image.Image) -> str:

@@ -10,17 +10,14 @@ from scipy.ndimage import distance_transform_edt
 from core.caching import get_cache
 from core.device import empty_cache, get_best_device, get_best_dtype
 from core.ml.model_manager import get_model_manager
-from core.ml.sdcpp_server import (
-    normalize_sdcpp_server_url,
-    pil_to_base64_png,
-    run_image_job,
-)
+from core.ml.sdcpp_server import pil_to_base64_png, run_image_job
 from utils.exceptions import ModelError
 from utils.logging import log_message
 from utils.model_metadata import (
     flux_sdcpp_quant_default,
     flux_sdcpp_text_encoder_default,
 )
+from utils.urls import normalize_sdcpp_server_url
 
 # Blur Parameters
 BLUR_SCALE_FACTOR = (

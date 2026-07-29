@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, Union
 
 from core.config import MangaTranslatorConfig, RenderingConfig, TranslationConfig
-from core.ml.sdcpp_server import normalize_sdcpp_server_url
 from utils.exceptions import ModelError, ValidationError
+from utils.urls import normalize_sdcpp_server_url
 
 SETTING_CONSTRAINTS: Dict[str, Tuple[float, float]] = {
     "confidence": (0.1, 1.0),
