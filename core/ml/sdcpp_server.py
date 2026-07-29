@@ -20,12 +20,10 @@ from PIL import Image
 from utils.exceptions import ModelError
 from utils.logging import log_message
 
-# Seconds to wait on any single request to an external sd.cpp server. A hosted
-# one can be scaled to zero and boot on the request that reaches it, which takes
-# longer than the local server needs to answer anything.
-REMOTE_REQUEST_TIMEOUT = 60
-# Seconds to wait on a local server, which is already up by the time we ask.
-LOCAL_REQUEST_TIMEOUT = 30
+# Seconds to wait on any single sd.cpp request. A hosted server can be scaled to
+# zero and boot on the request that reaches it; a local one answers immediately
+# and never notices the wider ceiling.
+REQUEST_TIMEOUT = 60
 
 
 def normalize_sdcpp_server_url(url: str) -> str:
@@ -41,24 +39,13 @@ def normalize_sdcpp_server_url(url: str) -> str:
         )
     if parsed.username or parsed.password:
         raise ModelError("Remote sd.cpp server URL must not contain credentials.")
-    if parsed.query or parsed.fragment:
-        raise ModelError(
-            "Remote sd.cpp server URL must not contain a query string or fragment."
-        )
-    try:
-        parsed.port
-    except ValueError as e:
-        raise ModelError(f"Remote sd.cpp server URL has an invalid port: {e}") from e
 
     return urlunsplit(
         (parsed.scheme.lower(), parsed.netloc, parsed.path.rstrip("/"), "", "")
     )
 
 
-# A remote server pays for every byte twice: once on the wire, once decoding a
-# multi-megabyte PNG on a billed container. JPEG q95 costs ~12/255 on the worst
-# screentone pixel and nothing visible, so remote jobs trade lossless for small.
-# A local server reads over loopback, where PNG is free.
+# JPEG q95 on the wire: a remote server pays per byte twice, local reads loopback.
 REMOTE_WIRE_QUALITY = 95
 
 
@@ -71,14 +58,6 @@ def pil_to_base64_image(image_pil: Image.Image, server: dict) -> str:
     else:
         image_rgb.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
-
-
-def _wire_output_options(server: dict) -> dict:
-    """Result encoding for `server`. JPEG over WebP: WebP is a build-time option
-    in sd.cpp, PNG and JPEG are always compiled in."""
-    if server.get("remote"):
-        return {"output_format": "jpeg", "output_compression": REMOTE_WIRE_QUALITY}
-    return {"output_format": "png", "output_compression": 100}
 
 
 def _json_request(
@@ -163,14 +142,19 @@ def run_image_job(
     log_path = server.get("log_path")
     log_suffix = f" Log: {log_path}" if log_path else ""
     log_offset = _log_offset(log_path)
-    payload = {**payload, **_wire_output_options(server)}
-    request_timeout = (
-        REMOTE_REQUEST_TIMEOUT if server.get("remote") else LOCAL_REQUEST_TIMEOUT
-    )
+    # JPEG over WebP: WebP is a build-time option in sd.cpp, JPEG is always there.
+    if server.get("remote"):
+        payload = {
+            **payload,
+            "output_format": "jpeg",
+            "output_compression": REMOTE_WIRE_QUALITY,
+        }
+    else:
+        payload = {**payload, "output_format": "png"}
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
     job = _json_request(
-        f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=request_timeout
+        f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=REQUEST_TIMEOUT
     )
     if job.get("status") == "completed" or job.get("result") or job.get("images"):
         log_message(
@@ -191,7 +175,7 @@ def run_image_job(
     deadline = time.monotonic() + timeout_sec
     next_log = time.monotonic() + 10
     while time.monotonic() < deadline:
-        status = _json_request(poll_url, timeout=request_timeout)
+        status = _json_request(poll_url, timeout=REQUEST_TIMEOUT)
         state = status.get("status")
         if state == "completed":
             log_message(
@@ -570,7 +554,7 @@ class SDCppServerManager:
         normalized_url = normalize_sdcpp_server_url(base_url)
         # A remote server is reached over the network rather than a loopback
         # socket we just opened, so allow far more slack than the local poll.
-        if not self._server_ready(normalized_url, timeout=REMOTE_REQUEST_TIMEOUT):
+        if not self._server_ready(normalized_url, timeout=REQUEST_TIMEOUT):
             raise ModelError(
                 f"Remote sd.cpp server is not reachable at {normalized_url}."
             )

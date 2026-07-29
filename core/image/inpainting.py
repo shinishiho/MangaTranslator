@@ -112,8 +112,7 @@ class FluxKontextInpainter:
             huggingface_token: HuggingFace token for model downloads (Nunchaku only).
             num_inference_steps: Number of denoising steps for inference.
             residual_diff_threshold: Residual diff threshold for Flux caching (Nunchaku only).
-            backend: "nunchaku" (CUDA + Nunchaku + HF token), "sdnq", managed
-                "sdcpp", or "sdcpp_remote" (an externally managed sd.cpp server).
+            backend: "nunchaku" (CUDA + Nunchaku + HF token), "sdnq", local/remote "sdcpp"
             sdcpp_remote_url: Base URL of the sd.cpp server for "sdcpp_remote".
             low_vram: If True, use sequential CPU offload for SDNQ.
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
@@ -811,7 +810,6 @@ class FluxKontextInpainter:
             cache_params["sdcpp_diffusion_quant"] = self.sdcpp_diffusion_quant
             cache_params["sdcpp_text_encoder_quant"] = self.sdcpp_text_encoder_quant
         elif self.backend == "sdcpp_remote":
-            # The remote server owns quant/cache settings, so its URL is the identity.
             cache_params["sdcpp_remote_url"] = self.sdcpp_remote_url
         if strict_mask_clipping:
             cache_params["strict_clip"] = True
@@ -1053,8 +1051,7 @@ class FluxKleinInpainter:
             low_vram: If True, use sequential CPU offload for SDNQ.
             luminance_correction: If True, match patch luminance to surrounding context.
             upscale_small_crops: If True, scale small crops to ~1MP before inference.
-            backend: "sdnq" for Diffusers/SDNQ, "sdcpp" for a managed
-                stable-diffusion.cpp server, or "sdcpp_remote" for an external one.
+            backend: "nunchaku" (CUDA + Nunchaku + HF token), "sdnq", local/remote "sdcpp"
             sdcpp_remote_url: Base URL of the sd.cpp server for "sdcpp_remote".
             sdcpp_cache_mode: sd.cpp cache mode to use when backend is "sdcpp".
             sdcpp_diffusion_quant: Flux sd.cpp diffusion model quant.
@@ -1151,7 +1148,6 @@ class FluxKleinInpainter:
         if self.backend == "sdcpp":
             self.manager.shutdown_sdcpp_server(f"flux_klein_{self.variant}")
         elif self.backend != "sdcpp_remote":
-            # We don't own a remote server's lifecycle, and it holds no local VRAM.
             self.manager.unload_flux_klein_models()
 
     def _get_prompt_embeddings(self, device: torch.device, verbose: bool = False):
@@ -1500,7 +1496,6 @@ class FluxKleinInpainter:
             cache_params["sdcpp_diffusion_quant"] = self.sdcpp_diffusion_quant
             cache_params["sdcpp_text_encoder_quant"] = self.sdcpp_text_encoder_quant
         elif self.backend == "sdcpp_remote":
-            # The remote server owns quant/cache settings, so its URL is the identity.
             cache_params["sdcpp_remote_url"] = self.sdcpp_remote_url
         if strict_mask_clipping:
             cache_params["strict_clip"] = True

@@ -51,13 +51,13 @@ def _radio_choices(values):
 def _flux_backend_choices(method: str):
     if method in ("flux_klein_9b", "flux_klein_4b"):
         return [
-            ("sd.cpp (managed)", "sdcpp"),
+            ("Local sd.cpp", "sdcpp"),
             ("Remote sd.cpp", "sdcpp_remote"),
             ("SDNQ", "sdnq"),
         ]
     if method == "flux_kontext":
         return [
-            ("sd.cpp (managed)", "sdcpp"),
+            ("Local sd.cpp", "sdcpp"),
             ("Remote sd.cpp", "sdcpp_remote"),
             ("SDNQ", "sdnq"),
             ("Nunchaku (CUDA)", "nunchaku"),

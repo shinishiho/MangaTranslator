@@ -640,11 +640,7 @@ def main():
         "--osb-flux-sdcpp-remote-url",
         type=str,
         default=None,
-        help=(
-            "Base URL of an already-running sd-server, for "
-            "--osb-flux-backend sdcpp_remote. "
-            "Defaults to MANGA_TRANSLATOR_FLUX_SDCPP_URL."
-        ),
+        help="Base URL of sd-server, for --osb-flux-backend sdcpp_remote.",
     )
     parser.add_argument(
         "--osb-flux-low-vram",
@@ -886,13 +882,12 @@ def main():
             "--osb-flux-backend nunchaku is only supported with "
             "--osb-inpainting-method flux_kontext."
         )
-    flux_sdcpp_remote_url = args.osb_flux_sdcpp_remote_url or os.environ.get(
-        "MANGA_TRANSLATOR_FLUX_SDCPP_URL", ""
-    )
-    if args.osb_flux_backend == "sdcpp_remote" and not flux_sdcpp_remote_url.strip():
+    if (
+        args.osb_flux_backend == "sdcpp_remote"
+        and not args.osb_flux_sdcpp_remote_url.strip()
+    ):
         parser.error(
-            "--osb-flux-backend sdcpp_remote requires "
-            "--osb-flux-sdcpp-remote-url or MANGA_TRANSLATOR_FLUX_SDCPP_URL."
+            "--osb-flux-backend sdcpp_remote requires --osb-flux-sdcpp-remote-url"
         )
     if args.osb_flux_backend == "sdcpp" and args.osb_flux_sdcpp_text_encoder_quant:
         valid_text_encoder_quants = flux_sdcpp_text_encoder_quants(
@@ -1203,7 +1198,7 @@ def main():
             huggingface_token=args.osb_hf_token or os.environ.get("HF_TOKEN", ""),
             inpainting_method=args.osb_inpainting_method,
             flux_backend=args.osb_flux_backend,
-            flux_sdcpp_remote_url=flux_sdcpp_remote_url,
+            flux_sdcpp_remote_url=args.osb_flux_sdcpp_remote_url,
             flux_low_vram=args.osb_flux_low_vram,
             flux_sdcpp_cache_mode=args.osb_flux_sdcpp_cache_mode,
             flux_sdcpp_diffusion_quant=args.osb_flux_sdcpp_diffusion_quant,

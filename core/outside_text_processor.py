@@ -30,7 +30,7 @@ OSB_EXPANSION_PIXEL_BUFFER = 5  # for bubbles, nearby OSB regions, panels
 
 FLUX_BACKEND_LABELS = {
     "sdnq": "SDNQ",
-    "sdcpp": "sd.cpp (managed)",
+    "sdcpp": "Local sd.cpp",
     "sdcpp_remote": "Remote sd.cpp",
     "nunchaku": "Nunchaku",
 }

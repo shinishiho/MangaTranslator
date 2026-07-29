@@ -16,12 +16,12 @@ from utils.model_metadata import (
 from . import callbacks, settings_manager, utils
 
 _FLUX_BACKEND_CHOICES_KLEIN = [
-    ("sd.cpp (managed)", "sdcpp"),
+    ("Local sd.cpp", "sdcpp"),
     ("Remote sd.cpp", "sdcpp_remote"),
     ("SDNQ", "sdnq"),
 ]
 _FLUX_BACKEND_CHOICES_KONTEXT = [
-    ("sd.cpp (managed)", "sdcpp"),
+    ("Local sd.cpp", "sdcpp"),
     ("Remote sd.cpp", "sdcpp_remote"),
     ("SDNQ", "sdnq"),
     ("Nunchaku (CUDA)", "nunchaku"),
@@ -1616,8 +1616,7 @@ def create_layout(
                                     value=_initial_backend,
                                     label="Flux Backend",
                                     info=(
-                                        "SDNQ/managed sd.cpp: cross-platform, no HF token. "
-                                        "Remote sd.cpp: use an external sd-server. "
+                                        "SDNQ/sd.cpp: cross-platform, no HF token. "
                                         "Nunchaku: CUDA-only, HF token required."
                                     ),
                                     visible=_backend_visible,
@@ -1629,9 +1628,8 @@ def create_layout(
                                     label="Remote sd.cpp URL",
                                     placeholder="http://127.0.0.1:1234",
                                     info=(
-                                        "Base URL of an already-running sd-server loaded "
-                                        "with the selected Flux model. Sent without "
-                                        "authentication, so keep it on a trusted network."
+                                        "Base URL of sd-server loaded with selected model. "
+                                        "Using mismatched model may yield unexpected results."
                                     ),
                                     visible=_backend_visible
                                     and _initial_backend == "sdcpp_remote",

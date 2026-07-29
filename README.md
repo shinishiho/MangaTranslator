@@ -194,36 +194,9 @@ If you want to use the OSB text pipeline, you need a Hugging Face token with acc
    - Env var (alternative): set `HF_TOKEN`
 5. Save config to preserve the token across sessions
 
-### Remote stable-diffusion.cpp Flux backend (optional)
+### External stable-diffusion.cpp server setup (optional)
 
-MangaTranslator can send Flux inpainting to an already-running
-[`sd-server`](https://github.com/leejet/stable-diffusion.cpp) instead of downloading GGUF
-weights and managing the server process itself. Useful when the GPU lives on another
-machine, or when you want to run `sd-server` with your own flags.
-
-1. Start `sd-server` yourself, loaded with the model matching your inpainting method
-   (see [Equivalent `sd-server` commands](#equivalent-sd-server-commands) below).
-2. Web UI: select **Remote sd.cpp** as the Flux Backend and enter `http://127.0.0.1:1234`
-   in **Remote sd.cpp URL**.
-3. CLI: pass `--osb-flux-backend sdcpp_remote` with `--osb-flux-sdcpp-remote-url`, or set
-   `MANGA_TRANSLATOR_FLUX_SDCPP_URL`.
-
-The app health-checks `<base-url>/v1/models`, submits jobs to `<base-url>/sdcpp/v1/img_gen`,
-and polls the job endpoint the server returns. It never downloads models for, starts, or
-stops a remote server, so the **Flux Model Quant**, **Text Encoder Model Quant** and
-**Cache Method** settings are hidden for this backend — the server owns them. A failed
-remote job falls back to OpenCV inpainting for that region.
-
-> **Point this at a single `sd-server`, not a load balancer.** `sd-server` keeps jobs in the
-> memory of the process that accepted them, so a proxy that spreads requests over several
-> replicas will route job polls to a replica that has never heard of the job. If you host
-> `sd-server` behind an autoscaler, cap it at one replica or enable session affinity.
-
-#### Equivalent `sd-server` commands
-
-These reproduce what the managed `sd.cpp` backend launches. Substitute your own paths; the
-managed backend keeps its downloads under `models/flux/sdcpp/`, so you can point at those
-files directly if you have already used it once.
+If you want to manage a stable-diffusion.cpp server instance yourself (perhaps to use another machine with better GPU), you can use these launch commands:
 
 **Flux.2 Klein 4B** (`--osb-inpainting-method flux_klein_4b`):
 
@@ -237,14 +210,14 @@ sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
   --sampling-method euler --steps 4
 ```
 
-**Flux.2 Klein 9B** (`flux_klein_9b`) — same as above with the 9B pair:
+**Flux.2 Klein 9B** (`flux_klein_9b`) — same as above, but replace `--diffusion-model` and `--llm`:
 
 ```bash
   --diffusion-model models/flux/sdcpp/flux-2-klein-9b-Q4_K_M.gguf \
   --llm          models/flux/sdcpp/Qwen3-8B-UD-Q4_K_XL.gguf \
 ```
 
-**Flux.1 Kontext** (`flux_kontext`) — different encoders, and guidance `2.5`:
+**Flux.1 Kontext** (`flux_kontext`):
 
 ```bash
 sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
@@ -257,38 +230,35 @@ sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
   --sampling-method euler --steps 8
 ```
 
-**Which flags actually matter.** MangaTranslator sends `sample_method`, `sample_steps` and
-the guidance values in every request, so `--sampling-method`, `--steps`, `--guidance`,
-`--cfg-scale` and `--img-cfg-scale` are only startup defaults and are overridden per job —
-they are listed above for parity, not because they must match. What you *do* need to get
-right is the model quartet (`--diffusion-model`, text encoder, `--vae`) for the inpainting
-method you select in MangaTranslator, since the app cannot tell what a remote server has
-loaded. `--fa`, `--eager-load`, `--offload-to-cpu` and the cache flags are launch-only and
-cannot be set remotely; tune them for your hardware.
+Note: you will need to prepare and download model weights yourself onto the machine running the server.
+You can select any quantization level suitable to your hardware.
 
-**Weights.** Download the quant you want from Hugging Face — diffusion models from
-`unsloth/FLUX.2-klein-4B-GGUF`, `unsloth/FLUX.2-klein-9B-GGUF` or
-`unsloth/FLUX.1-Kontext-dev-GGUF`; text encoders from `unsloth/Qwen3-4B-GGUF`,
-`unsloth/Qwen3-8B-GGUF` (Klein) or `city96/t5-v1_1-xxl-encoder-gguf` (Kontext). The Klein
-VAE is `Comfy-Org/flux2-dev` → `split_files/vae/flux2-vae.safetensors`; Kontext uses
-`comfyanonymous/flux_text_encoders` → `clip_l.safetensors` and
-`Comfy-Org/Lumina_Image_2.0_Repackaged` → `split_files/vae/ae.safetensors`.
+**Weights.** Download the quant you want from Hugging Face:
 
-**Cache modes.** The managed backend's **Cache Method** maps to these launch flags, where
-`W = ceil(steps / 4)`. Append whichever you want to your `sd-server` command:
+| Model               | Component    | Hugging Face repo                                                                                     | File                                    |
+| ------------------- | ------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Flux.2 Klein 4B** | Diffusion    | [unsloth/FLUX.2-klein-4B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF)                   | _(pick a quant)_                        |
+|                     | Text encoder | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF)                                 | _(pick a quant)_                        |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors` |
+| **Flux.2 Klein 9B** | Diffusion    | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF)                   | _(pick a quant)_                        |
+|                     | Text encoder | [unsloth/Qwen3-8B-GGUF](https://huggingface.co/unsloth/Qwen3-8B-GGUF)                                 | _(pick a quant)_                        |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors` |
+| **Flux.1 Kontext**  | Diffusion    | [unsloth/FLUX.1-Kontext-dev-GGUF](https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF)             | _(pick a quant)_                        |
+|                     | Text encoder | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf)             | _(pick a quant)_                        |
+|                     | CLIP-L       | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders)         | `clip_l.safetensors`                    |
+|                     | VAE          | [Comfy-Org/Lumina_Image_2.0_Repackaged](https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged) | `split_files/vae/ae.safetensors`        |
 
-| Cache Method | Flags |
-| --- | --- |
-| `none` | *(no cache flags)* |
-| `spectrum` | `--cache-mode spectrum --cache-option warmup=W,window=2,stop=0.8` |
-| `cache-dit` | `--cache-mode cache-dit --cache-option Fn=4,Bn=0,threshold=0.10,warmup=W --scm-policy dynamic` |
-| `taylorseer` | `--cache-mode taylorseer --cache-option Fn=4,Bn=0,warmup=W` |
-| `dbcache` | `--cache-mode dbcache --cache-option Fn=8,Bn=0,threshold=0.08,warmup=W` |
+**Cache modes.** When using bundled sdcpp server, you can configure this in the Config tab.
+Append this to your stable-diffusion.cpp server launch command.
+Ordered fastest/worst quality -> slowest/best quality. Warmup is 25% of the selected step count.
 
-> [!WARNING]
-> This integration sends no authentication. Keep `sd-server` on localhost or a trusted
-> private network, or put it behind an authenticating proxy. Upstream also changes its API
-> fairly often, so keep the server version compatible when upgrading.
+| Cache Method | Flags                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `spectrum`   | `--cache-mode spectrum --cache-option warmup=W,window=2,stop=0.8`                              |
+| `cache-dit`  | `--cache-mode cache-dit --cache-option Fn=4,Bn=0,threshold=0.10,warmup=W --scm-policy dynamic` |
+| `taylorseer` | `--cache-mode taylorseer --cache-option Fn=4,Bn=0,warmup=W`                                    |
+| `dbcache`    | `--cache-mode dbcache --cache-option Fn=8,Bn=0,threshold=0.08,warmup=W`                        |
+| `none`       | _(no cache flags)_                                                                             |
 
 ## Run
 
@@ -326,7 +296,7 @@ python main.py --input <image_path> \
   --font-dir "fonts/Komika" --provider Google --google-api-key <AI...> \
   --osb-enable --osb-font-dir "fonts/Clementine"
 
-# OSB inpainting through a separately managed stable-diffusion.cpp server
+# Use external stable-diffusion.cpp server for Flux inpainting
 python main.py --input <image_path> --cleaning-only \
   --osb-enable --osb-inpainting-method flux_klein_4b \
   --osb-flux-backend sdcpp_remote \
