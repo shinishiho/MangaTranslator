@@ -1,3 +1,4 @@
+import contextlib
 import math
 from typing import Dict, Optional, Tuple
 
@@ -30,6 +31,14 @@ MAX_BLUR_RADIUS = 10  # Maximum blur radius in pixels
 FLUX_GUIDANCE_SCALE = 2.5  # Flux Kontext guidance scale
 CONTEXT_PADDING_RATIO = 0.5  # Context padding is 50% of detection size
 MAX_CONTEXT_PADDING = 80  # Context padding capped at 80 pixels
+
+
+# CPU offload moves weights between devices; serialize access across threads
+# except for remote sdcpp
+def _inference_lock(manager, backend: str):
+    if backend == "sdcpp_remote":
+        return contextlib.nullcontext()
+    return manager.flux_inference_lock
 
 
 def _prompt_value_to_cpu(value):
@@ -865,8 +874,7 @@ class FluxKontextInpainter:
 
             required_area = inference_width * inference_height
 
-            # CPU offload moves weights between devices; serialize access across threads
-            with self.manager.flux_inference_lock:
+            with _inference_lock(self.manager, self.backend):
                 self.load_models()
 
                 if self.pipeline is None:
@@ -1585,7 +1593,7 @@ class FluxKleinInpainter:
 
             log_message("  - Running inference...", verbose=verbose)
 
-            with self.manager.flux_inference_lock:
+            with _inference_lock(self.manager, self.backend):
                 self.load_models()
 
                 if self.pipeline is None:
