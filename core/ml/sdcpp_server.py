@@ -20,8 +20,12 @@ from PIL import Image
 from utils.exceptions import ModelError
 from utils.logging import log_message
 
-# Seconds to wait for an external sd.cpp server's health check.
-REMOTE_HEALTH_TIMEOUT = 60
+# Seconds to wait on any single request to an external sd.cpp server. A hosted
+# one can be scaled to zero and boot on the request that reaches it, which takes
+# longer than the local server needs to answer anything.
+REMOTE_REQUEST_TIMEOUT = 60
+# Seconds to wait on a local server, which is already up by the time we ask.
+LOCAL_REQUEST_TIMEOUT = 30
 
 
 def normalize_sdcpp_server_url(url: str) -> str:
@@ -160,9 +164,14 @@ def run_image_job(
     log_suffix = f" Log: {log_path}" if log_path else ""
     log_offset = _log_offset(log_path)
     payload = {**payload, **_wire_output_options(server)}
+    request_timeout = (
+        REMOTE_REQUEST_TIMEOUT if server.get("remote") else LOCAL_REQUEST_TIMEOUT
+    )
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
-    job = _json_request(f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=30)
+    job = _json_request(
+        f"{base_url}/sdcpp/v1/img_gen", payload=payload, timeout=request_timeout
+    )
     if job.get("status") == "completed" or job.get("result") or job.get("images"):
         log_message(
             f"  - sd.cpp inference completed in {time.monotonic() - start:.1f}s.",
@@ -182,7 +191,7 @@ def run_image_job(
     deadline = time.monotonic() + timeout_sec
     next_log = time.monotonic() + 10
     while time.monotonic() < deadline:
-        status = _json_request(poll_url, timeout=30)
+        status = _json_request(poll_url, timeout=request_timeout)
         state = status.get("status")
         if state == "completed":
             log_message(
@@ -561,7 +570,7 @@ class SDCppServerManager:
         normalized_url = normalize_sdcpp_server_url(base_url)
         # A remote server is reached over the network rather than a loopback
         # socket we just opened, so allow far more slack than the local poll.
-        if not self._server_ready(normalized_url, timeout=REMOTE_HEALTH_TIMEOUT):
+        if not self._server_ready(normalized_url, timeout=REMOTE_REQUEST_TIMEOUT):
             raise ModelError(
                 f"Remote sd.cpp server is not reachable at {normalized_url}."
             )
