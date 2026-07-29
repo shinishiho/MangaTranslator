@@ -73,6 +73,23 @@ def _image_from_result(result: dict) -> Image.Image:
         raise ModelError(f"Failed to decode sd.cpp output image: {e}") from e
 
 
+def _model_id_from_listing(body: bytes) -> str:
+    """Best-effort model ids from a /v1/models body; "" if it says nothing useful."""
+    try:
+        listing = json.loads(body.decode("utf-8"))
+    except Exception:
+        return ""
+    entries = listing.get("data") if isinstance(listing, dict) else listing
+    if not isinstance(entries, list):
+        return ""
+    ids = sorted(
+        str(entry.get("id"))
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("id")
+    )
+    return ",".join(ids)
+
+
 def _log_offset(log_path) -> int:
     if log_path is None:
         return 0
@@ -517,16 +534,19 @@ class SDCppServerManager:
         try:
             with urllib.request.urlopen(
                 f"{normalized_url}/v1/models", timeout=REQUEST_TIMEOUT
-            ):
-                pass
+            ) as response:
+                listing = response.read()
         except Exception as e:
             raise ModelError(
-                f"Remote sd.cpp server is not reachable at {normalized_url}."
+                f"Remote sd.cpp server is not reachable at {normalized_url}: {e}"
             ) from e
 
+        served = _model_id_from_listing(listing)
+        served_suffix = f" (serving: {served})" if served else ""
         log_message(
-            f"Using external sd.cpp server for {model_key} at {normalized_url}.",
-            verbose=verbose,
+            f"Using external sd.cpp server for {model_key} "
+            f"at {normalized_url}{served_suffix}.",
+            always_print=True,
         )
         return {"url": normalized_url, "model_key": model_key, "remote": True}
 
