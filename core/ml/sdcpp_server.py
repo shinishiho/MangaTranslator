@@ -113,7 +113,6 @@ def run_image_job(
     log_path = server.get("log_path")
     log_suffix = f" Log: {log_path}" if log_path else ""
     log_offset = _log_offset(log_path)
-    payload = {**payload, "output_format": "png", "output_compression": 100}
     start = time.monotonic()
     log_message("  - Submitting sd.cpp inference job...", always_print=True)
     job = _json_request(

@@ -198,10 +198,12 @@ If you want to use the OSB text pipeline, you need a Hugging Face token with acc
 
 If you want to manage a stable-diffusion.cpp server instance yourself (perhaps to use another machine with better GPU), you can use these launch commands:
 
+#### Models
+
 **Flux.2 Klein 4B** (`--osb-inpainting-method flux_klein_4b`):
 
 ```bash
-sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
+sd-server --listen-ip 0.0.0.0 --listen-port 1234 \
   --diffusion-model models/flux/sdcpp/flux-2-klein-4b-Q4_K_M.gguf \
   --llm          models/flux/sdcpp/Qwen3-4B-UD-Q4_K_XL.gguf \
   --vae          models/flux/sdcpp/flux2-vae.safetensors \
@@ -220,7 +222,7 @@ sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
 **Flux.1 Kontext** (`flux_kontext`):
 
 ```bash
-sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
+sd-server --listen-ip 0.0.0.0 --listen-port 1234 \
   --diffusion-model models/flux/sdcpp/kontext/flux1-kontext-dev-Q4_K_M.gguf \
   --clip_l       models/flux/sdcpp/kontext/clip_l.safetensors \
   --t5xxl        models/flux/sdcpp/kontext/t5-v1_1-xxl-encoder-Q4_K_M.gguf \
@@ -248,7 +250,9 @@ You can select any quantization level suitable to your hardware.
 |                     | CLIP-L       | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders)         | `clip_l.safetensors`                                 |
 |                     | VAE          | [Comfy-Org/Lumina_Image_2.0_Repackaged](https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged) | `split_files/vae/ae.safetensors`                     |
 
-**Cache modes.** When using the bundled sdcpp server, you can configure this in the Config tab.
+#### Cache modes
+
+When using the bundled sdcpp server, you can configure this in the Config tab.
 Equivalently, append this to your stable-diffusion.cpp server launch command.
 Ordered fastest/worst quality -> slowest/best quality. Warmup is 25% of the selected step count.
 
@@ -300,7 +304,7 @@ python main.py --input <image_path> \
 python main.py --input <image_path> --cleaning-only \
   --osb-enable --osb-inpainting-method flux_klein_4b \
   --osb-flux-backend sdcpp_remote \
-  --osb-flux-sdcpp-remote-url http://127.0.0.1:1234
+  --osb-flux-sdcpp-remote-url http(s)://<server-ip>:port
 
 # Cleaning-only mode (no translation/text rendering)
 python main.py --input <image_path> --cleaning-only
