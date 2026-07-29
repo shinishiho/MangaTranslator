@@ -20,9 +20,7 @@ from utils.exceptions import ModelError
 from utils.logging import log_message
 from utils.urls import normalize_sdcpp_server_url
 
-# Seconds to wait on any single sd.cpp request. A hosted server can be scaled to
-# zero and boot on the request that reaches it; a local one answers immediately
-# and never notices the wider ceiling.
+# Longer timeout for remote sd.cpp server
 REQUEST_TIMEOUT = 60
 
 
@@ -505,9 +503,9 @@ class SDCppServerManager:
             sock.bind(("127.0.0.1", 0))
             return int(sock.getsockname()[1])
 
-    def _server_ready(self, base_url: str, timeout: float = 2) -> bool:
+    def _server_ready(self, base_url: str) -> bool:
         try:
-            with urllib.request.urlopen(f"{base_url}/v1/models", timeout=timeout):
+            with urllib.request.urlopen(f"{base_url}/v1/models", timeout=2):
                 return True
         except Exception:
             return False
@@ -517,12 +515,15 @@ class SDCppServerManager:
     ) -> dict:
         """Validate and return a non-owning handle to an external sd.cpp server."""
         normalized_url = normalize_sdcpp_server_url(base_url)
-        # A remote server is reached over the network rather than a loopback
-        # socket we just opened, so allow far more slack than the local poll.
-        if not self._server_ready(normalized_url, timeout=REQUEST_TIMEOUT):
+        try:
+            with urllib.request.urlopen(
+                f"{normalized_url}/v1/models", timeout=REQUEST_TIMEOUT
+            ):
+                pass
+        except Exception as e:
             raise ModelError(
                 f"Remote sd.cpp server is not reachable at {normalized_url}."
-            )
+            ) from e
 
         log_message(
             f"Using external sd.cpp server for {model_key} at {normalized_url}.",
