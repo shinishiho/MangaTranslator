@@ -230,26 +230,26 @@ sd-server --listen-ip 127.0.0.1 --listen-port 1234 \
   --sampling-method euler --steps 8
 ```
 
-Note: you will need to prepare and download model weights yourself onto the machine running the server.
+Note: you will need to download stable-diffusion.cpp and model weights onto the machine running the server yourself.
 You can select any quantization level suitable to your hardware.
 
 **Weights.** Download the quant you want from Hugging Face:
 
-| Model               | Component    | Hugging Face repo                                                                                     | File                                    |
-| ------------------- | ------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| **Flux.2 Klein 4B** | Diffusion    | [unsloth/FLUX.2-klein-4B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF)                   | _(pick a quant)_                        |
-|                     | Text encoder | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF)                                 | _(pick a quant)_                        |
-|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors` |
-| **Flux.2 Klein 9B** | Diffusion    | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF)                   | _(pick a quant)_                        |
-|                     | Text encoder | [unsloth/Qwen3-8B-GGUF](https://huggingface.co/unsloth/Qwen3-8B-GGUF)                                 | _(pick a quant)_                        |
-|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors` |
-| **Flux.1 Kontext**  | Diffusion    | [unsloth/FLUX.1-Kontext-dev-GGUF](https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF)             | _(pick a quant)_                        |
-|                     | Text encoder | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf)             | _(pick a quant)_                        |
-|                     | CLIP-L       | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders)         | `clip_l.safetensors`                    |
-|                     | VAE          | [Comfy-Org/Lumina_Image_2.0_Repackaged](https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged) | `split_files/vae/ae.safetensors`        |
+| Model               | Component    | Hugging Face repo                                                                                     | File                                                 |
+| ------------------- | ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Flux.2 Klein 4B** | Diffusion    | [unsloth/FLUX.2-klein-4B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF)                   | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF)                                 | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors`              |
+| **Flux.2 Klein 9B** | Diffusion    | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF)                   | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [unsloth/Qwen3-8B-GGUF](https://huggingface.co/unsloth/Qwen3-8B-GGUF)                                 | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | VAE          | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev)                                     | `split_files/vae/flux2-vae.safetensors`              |
+| **Flux.1 Kontext**  | Diffusion    | [unsloth/FLUX.1-Kontext-dev-GGUF](https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF)             | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | Text encoder | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf)             | `Q3_K_M`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, or `Q8_0` GGUF |
+|                     | CLIP-L       | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders)         | `clip_l.safetensors`                                 |
+|                     | VAE          | [Comfy-Org/Lumina_Image_2.0_Repackaged](https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged) | `split_files/vae/ae.safetensors`                     |
 
-**Cache modes.** When using bundled sdcpp server, you can configure this in the Config tab.
-Append this to your stable-diffusion.cpp server launch command.
+**Cache modes.** When using the bundled sdcpp server, you can configure this in the Config tab.
+Equivalently, append this to your stable-diffusion.cpp server launch command.
 Ordered fastest/worst quality -> slowest/best quality. Warmup is 25% of the selected step count.
 
 | Cache Method | Flags                                                                                          |
@@ -258,7 +258,7 @@ Ordered fastest/worst quality -> slowest/best quality. Warmup is 25% of the sele
 | `cache-dit`  | `--cache-mode cache-dit --cache-option Fn=4,Bn=0,threshold=0.10,warmup=W --scm-policy dynamic` |
 | `taylorseer` | `--cache-mode taylorseer --cache-option Fn=4,Bn=0,warmup=W`                                    |
 | `dbcache`    | `--cache-mode dbcache --cache-option Fn=8,Bn=0,threshold=0.08,warmup=W`                        |
-| `none`       | _(no cache flags)_                                                                             |
+| `none`       | _(blank)_                                                                                      |
 
 ## Run
 
